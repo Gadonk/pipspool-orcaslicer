@@ -22,6 +22,10 @@ slicing and does not create duplicate process profiles.
 - Supports optional custom Start G-code for individual physical spools.
 - Imports nozzle and bed temperatures from Spoolman.
 - Applies the bed temperature to OrcaSlicer's supported build-plate types.
+- Lets the user choose which advanced Orca Filament, Cooling, and Multimaterial
+  parameters are synchronized through Spoolman.
+- Keeps advanced synchronization opt-in through a grouped Plugin configuration
+  checklist, so Spoolman remains clean and readable.
 - Preserves Orca-specific profile adjustments when synchronizing again.
 - Includes a simple connection test and an embedded offline logo.
 - Opens setup automatically only on the first launch.
@@ -60,6 +64,17 @@ Spoolman spools into OrcaSlicer.
 
 The settings window remains available through **PipSpool Settings** if the
 server address changes later.
+
+## Advanced filament field selection
+
+Open PipSpool's **Plugin configuration** for **Sync Spoolman Profiles** and
+choose only the Filament, Cooling, and Multimaterial settings you want exposed
+in Spoolman. No advanced fields are selected by default; ordinary spool data,
+temperatures and spool-ID G-code continue working normally.
+
+The optional removal checkbox deletes unselected PipSpool field definitions and
+their saved values for every filament. Enable it only when intentionally cleaning
+up old fields, run one synchronization, and then disable it again.
 
 ## What synchronization does
 
@@ -143,4 +158,3 @@ server address during first-time setup.
 
 Source code, releases and issue reporting:
 [github.com/Gadonk/pipspool-orcaslicer](https://github.com/Gadonk/pipspool-orcaslicer)
-

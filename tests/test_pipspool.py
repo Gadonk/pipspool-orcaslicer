@@ -24,7 +24,7 @@ def load_plugin_module():
     requests.post = Mock()
     sys.modules["requests"] = requests
 
-    path = Path(__file__).parents[1] / "pipspool_v2_0_8_win_x86_64.py"
+    path = Path(__file__).parents[1] / "pipspool_v2_1_0_win_x86_64.py"
     spec = importlib.util.spec_from_file_location("pipspool_v2_dev", path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -124,6 +124,7 @@ class SynchronizationTests(unittest.TestCase):
             "id": 42,
             "price": 20,
             "filament": {
+                "id": 7,
                 "name": name,
                 "material": "PLA",
                 "color_hex": color,
@@ -131,8 +132,107 @@ class SynchronizationTests(unittest.TestCase):
                 "settings_extruder_temp": 218,
                 "settings_bed_temp": 57,
                 "vendor": {"name": "Example"},
+                "extra": {},
             },
         }
+
+    def test_parent_selection_requires_exact_material_type(self):
+        self.profiles.system_presets = {
+            "Generic PLA-CF @System": {"name": "Generic PLA-CF @System", "filament_type": ["PLA-CF"]},
+            "Generic ASA @System": {"name": "Generic ASA @System", "filament_type": ["ASA"]},
+            "Generic PLA @System": {"name": "Generic PLA @System", "filament_type": ["PLA"]},
+        }
+        self.assertEqual(self.profiles.parent_for("Example", "ASA"), "Generic ASA @System")
+        self.assertEqual(self.profiles.parent_for("Example", "PLA"), "Generic PLA @System")
+
+    def test_spoolman_filament_override_wins_after_core_values(self):
+        spool = self.spool()
+        spool["filament"]["extra"] = {
+            pipspool.orca_extra_key("fan_max_speed"): json.dumps(["35"]),
+            pipspool.orca_extra_key("nozzle_temperature"): json.dumps(["230"]),
+        }
+        pipspool.sync_profiles([spool], self.profiles)
+        data = json.loads(next(self.filament_dir.glob("*.json")).read_text(encoding="utf-8"))
+        self.assertEqual(data["fan_max_speed"], ["35"])
+        self.assertEqual(data["nozzle_temperature"], ["230"])
+
+    def test_only_selected_advanced_fields_are_read_into_profile(self):
+        spool = self.spool()
+        spool["filament"]["extra"] = {
+            pipspool.orca_extra_key("fan_max_speed"): json.dumps(["35"]),
+            pipspool.orca_extra_key("filament_loading_speed"): json.dumps(["28"]),
+        }
+
+        pipspool.sync_profiles(
+            [spool], self.profiles, selected_settings=("fan_max_speed",)
+        )
+
+        data = json.loads(next(self.filament_dir.glob("*.json")).read_text(encoding="utf-8"))
+        self.assertEqual(data["fan_max_speed"], ["35"])
+        self.assertNotIn("filament_loading_speed", data)
+
+    def test_initializes_only_empty_spoolman_fields_from_orca(self):
+        self.profiles.system_presets = {
+            "Generic PLA @System": {
+                "name": "Generic PLA @System",
+                "filament_type": ["PLA"],
+                "fan_max_speed": ["100"],
+                "filament_loading_speed": ["28"],
+            }
+        }
+        spool = self.spool()
+        existing_key = pipspool.orca_extra_key("fan_max_speed")
+        spool["filament"]["extra"] = {existing_key: json.dumps(["40"])}
+        client = Mock()
+
+        updated = pipspool.synchronize_filament_settings([spool], self.profiles, client)
+
+        self.assertEqual(updated, 1)
+        values = client.update_filament_extras.call_args.args[1]
+        self.assertNotIn(existing_key, values)
+        self.assertEqual(
+            json.loads(json.loads(values[pipspool.orca_extra_key("filament_loading_speed")])),
+            ["28"],
+        )
+
+    def test_only_selected_fields_are_initialized_in_spoolman(self):
+        self.profiles.system_presets = {
+            "Generic PLA @System": {
+                "name": "Generic PLA @System",
+                "filament_type": ["PLA"],
+                "fan_max_speed": ["100"],
+                "filament_loading_speed": ["28"],
+            }
+        }
+        client = Mock()
+
+        pipspool.synchronize_filament_settings(
+            [self.spool()], self.profiles, client,
+            selected_settings=("fan_max_speed",),
+        )
+
+        values = client.update_filament_extras.call_args.args[1]
+        self.assertEqual(set(values), {pipspool.orca_extra_key("fan_max_speed")})
+
+    def test_reset_replaces_spoolman_override_from_orca(self):
+        self.profiles.system_presets = {
+            "Generic PLA @System": {
+                "name": "Generic PLA @System",
+                "filament_type": ["PLA"],
+                "fan_max_speed": ["100"],
+            }
+        }
+        spool = self.spool()
+        key = pipspool.orca_extra_key("fan_max_speed")
+        spool["filament"]["extra"] = {key: json.dumps(["40"])}
+        client = Mock()
+
+        pipspool.synchronize_filament_settings(
+            [spool], self.profiles, client, reset=True
+        )
+
+        values = client.update_filament_extras.call_args.args[1]
+        self.assertEqual(json.loads(json.loads(values[key])), ["100"])
 
     def test_renames_same_id_and_preserves_orca_overrides(self):
         old_path = self.filament_dir / "Example Old Name (#42) - Spoolman.json"
@@ -222,18 +322,41 @@ class SynchronizationTests(unittest.TestCase):
         self.assertIn("SET_ACTIVE_SPOOL ID=42", start_gcode)
 
 
+class FieldConfigurationTests(unittest.TestCase):
+    def test_default_config_selects_no_advanced_fields(self):
+        self.assertEqual(
+            pipspool.SyncCapability().get_default_config(),
+            {"selected_fields": [], "remove_unselected_fields": False},
+        )
+
+    def test_config_ignores_unknown_fields_and_preserves_orca_order(self):
+        selected, remove = pipspool.parse_field_config(json.dumps({
+            "selected_fields": ["unknown", "fan_max_speed", "filament_density"],
+            "remove_unselected_fields": True,
+        }))
+        self.assertEqual(selected, ("filament_density", "fan_max_speed"))
+        self.assertTrue(remove)
+
+    def test_config_ui_contains_groups_and_destructive_warning(self):
+        html = pipspool.SyncCapability().get_config_ui()
+        self.assertIn("Filament", html)
+        self.assertIn("Cooling", html)
+        self.assertIn("Multimaterial", html)
+        self.assertIn("deletes their saved values", html)
+
+
 class ArchitectureTests(unittest.TestCase):
     def test_only_intended_capabilities_are_registered(self):
-        source = (Path(__file__).parents[1] / "pipspool_v2_0_8_win_x86_64.py").read_text(
+        source = (Path(__file__).parents[1] / "pipspool_v2_1_0_win_x86_64.py").read_text(
             encoding="utf-8"
         )
         self.assertNotIn("SlicingPipelineCapabilityBase", source)
         self.assertNotIn("/use", source)
         self.assertNotIn("requests.put", source)
-        self.assertEqual(source.count("orca.register_capability("), 3)
+        self.assertEqual(source.count("orca.register_capability("), 4)
 
     def test_settings_ui_has_clear_actions(self):
-        source = (Path(__file__).parents[1] / "pipspool_v2_0_8_win_x86_64.py").read_text(
+        source = (Path(__file__).parents[1] / "pipspool_v2_1_0_win_x86_64.py").read_text(
             encoding="utf-8"
         )
         self.assertIn("Test connection", source)

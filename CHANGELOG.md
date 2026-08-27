@@ -2,7 +2,26 @@
 
 All notable PipSpool changes are documented here.
 
-## [2.0.8] - 2026-08-27\n\n- Moved the filament material immediately after the spool number in generated profile names.\n- Changed the remaining name order to filament name, manufacturer, and PipSpool.\n- Avoided duplicate material text when the Spoolman filament name already begins with its material.\n- Existing profiles continue to be renamed by stable spool ID without creating duplicates.\n- Confirmed all 17 behavior and architecture tests pass.\n\n## [2.0.7] - 2026-08-27
+## [2.1.0] - 2026-08-27
+
+- Added Orca-master synchronization for selected Filament, Cooling, and Multimaterial settings.
+- Added a grouped opt-in Plugin configuration checklist; advanced fields are disabled by default.
+- Creates, initializes, and reads only the advanced fields selected by the user.
+- Added an explicit warned option to remove unselected PipSpool fields and their values from Spoolman.
+- Uses exact material-type inheritance so PLA, ASA, composites, and other families do not cross.
+- Retains Spoolman text-field values through their required encoded round trip.
+- Reset Filament Settings now follows the most recently synchronized field selection.
+- Confirmed all 26 behavior, configuration, and architecture tests pass.
+
+## [2.0.8] - 2026-08-27
+
+- Moved the filament material immediately after the spool number in generated profile names.
+- Changed the remaining name order to filament name, manufacturer, and PipSpool.
+- Avoided duplicate material text when the Spoolman filament name already begins with its material.
+- Existing profiles continue to be renamed by stable spool ID without creating duplicates.
+- Confirmed all 17 behavior and architecture tests pass.
+
+## [2.0.7] - 2026-08-27
 
 - Added optional per-spool Start G-code synchronized from Spoolman.
 - Automatically creates the spool-level Spoolman `start_gcode` text field when needed.
