@@ -41,10 +41,8 @@ Do not enable PipSpool and the older Spoolman Bridge plugin simultaneously.
 
 The public source uses `http://localhost:7912`. Set the address of your Spoolman server in the PipSpool settings dialog. GitHub Actions rejects private development addresses.
 
-## Provenance and license
+## License
 
-PipSpool 2.0 is a clean architectural replacement for the inherited 1.1.x development line. Its documented comparison found no substantial matching algorithmic block. See [PROVENANCE.md](PROVENANCE.md) for the implementation boundaries, comparison results, and tests.
-
-The repository currently retains the earlier MIT notice while the maintainer completes the final licensing reassessment. Historical inherited builds are not distributed from this repository.
+PipSpool is maintained and copyrighted by **Donko** and distributed under the [MIT License](LICENSE).
 
 The PipSpool logo is original artwork based on Donko's Pip character and an independently designed filament-spool/database motif. It does not reproduce the official Spoolman logo or wordmark.
