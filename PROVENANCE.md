@@ -2,12 +2,14 @@
 
 ## Purpose
 
-PipSpool 2.0 is a clean architectural replacement for the inherited 1.1.x development line. This record tracks whether substantial implementation from Zao Soula's OrcaSlicer Spoolman Bridge remains.
+PipSpool 2.0 is a clean architectural replacement for the inherited 1.1.x
+development line. This record tracks whether substantial implementation from
+Zao Soula's OrcaSlicer Spoolman Bridge remains.
 
 ## Compared artifacts
 
 - Inherited baseline: `pipspool_v1_1_4_dev.py` (1,417 lines)
-- Clean implementation: `pipspool_v2_0_0_dev.py` (533 lines)
+- Clean implementation: `pipspool_v2_0_5_dev.py` (based on the independently rewritten 2.0 series)
 - Comparison date: 2026-08-27
 
 ## Implementation boundaries
@@ -19,7 +21,8 @@ The clean implementation was written around public interfaces:
 - OrcaSlicer JSON filament-preset fields
 - Moonraker/Klipper `SET_SPOOL_ID ID=<id>` behavior
 
-It does not register a slicing-pipeline capability, parse G-code, deduct filament, create Spoolman extra fields, or generate duplicate process presets.
+It does not register a slicing-pipeline capability, parse G-code, deduct
+filament, create Spoolman extra fields, or generate duplicate process presets.
 
 ## Textual comparison
 
@@ -48,11 +51,18 @@ No substantial algorithmic block was found as an exact textual match.
 - managed spool-ID G-code replacement without deleting custom G-code
 - cleanup of inactive generated presets
 - absence of slicing-pipeline and HTTP deduction code
+- automatic settings opening through Orca's capability-load lifecycle
+- clear settings actions and an embedded offline logo
+- Spoolman nozzle and bed temperatures across every Orca build-plate type
 
-All five tests passed on 2026-08-27.
+All eight tests passed on 2026-08-27.
 
 ## Attribution status
 
-The technical comparison supports a licensing reassessment for the clean 2.0 implementation. The inherited 1.1.x file remains subject to its original MIT notice and must not be distributed without it. The repository-level notice should remain until the inherited file is removed from distributed artifacts and the maintainer has completed the final licensing review.
+The technical comparison supports a licensing reassessment for the clean 2.0
+implementation. The inherited 1.1.x file remains subject to its original MIT
+notice and must not be distributed without it. The repository-level notice
+should remain until the inherited file is removed from distributed artifacts
+and the maintainer has completed the final licensing review.
 
 This record is technical evidence, not legal advice.
