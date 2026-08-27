@@ -18,7 +18,7 @@ def load_plugin_module():
     orca.PluginResult = types.SimpleNamespace(RecoverableError="recoverable")
     sys.modules["orca"] = orca
 
-    path = Path(__file__).parents[1] / "pipspool_v2_0_0_dev.py"
+    path = Path(__file__).parents[1] / "pipspool_v2_0_5_dev.py"
     spec = importlib.util.spec_from_file_location("pipspool_v2_dev", path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -66,6 +66,8 @@ class SynchronizationTests(unittest.TestCase):
                 "material": "PLA",
                 "color_hex": color,
                 "weight": 1000,
+                "settings_extruder_temp": 218,
+                "settings_bed_temp": 57,
                 "vendor": {"name": "Example"},
             },
         }
@@ -102,6 +104,24 @@ class SynchronizationTests(unittest.TestCase):
         self.assertEqual(data["default_filament_colour"], ["#FFFFFF"])
         self.assertEqual(report.updated, 1)
 
+    def test_uses_spoolman_temperatures_for_nozzle_and_every_bed_type(self):
+        pipspool.sync_profiles([self.spool()], self.profiles)
+        path = next(self.filament_dir.glob("*.json"))
+        data = json.loads(path.read_text(encoding="utf-8"))
+
+        self.assertEqual(data["nozzle_temperature"], ["218"])
+        self.assertEqual(data["nozzle_temperature_initial_layer"], ["218"])
+        for plate_key in (
+            "supertack_plate_temp",
+            "cool_plate_temp",
+            "textured_cool_plate_temp",
+            "eng_plate_temp",
+            "hot_plate_temp",
+            "textured_plate_temp",
+        ):
+            self.assertEqual(data[plate_key], ["57"])
+            self.assertEqual(data[f"{plate_key}_initial_layer"], ["57"])
+
     def test_removes_inactive_generated_profile(self):
         pipspool.sync_profiles([self.spool()], self.profiles)
         report = pipspool.sync_profiles([], self.profiles)
@@ -111,13 +131,30 @@ class SynchronizationTests(unittest.TestCase):
 
 class ArchitectureTests(unittest.TestCase):
     def test_only_intended_capabilities_are_registered(self):
-        source = (Path(__file__).parents[1] / "pipspool_v2_0_0_dev.py").read_text(
+        source = (Path(__file__).parents[1] / "pipspool_v2_0_5_dev.py").read_text(
             encoding="utf-8"
         )
         self.assertNotIn("SlicingPipelineCapabilityBase", source)
         self.assertNotIn("/use", source)
         self.assertNotIn("requests.put", source)
         self.assertEqual(source.count("orca.register_capability("), 3)
+
+    def test_settings_ui_has_clear_actions(self):
+        source = (Path(__file__).parents[1] / "pipspool_v2_0_5_dev.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Test connection", source)
+        self.assertIn("Save settings", source)
+        self.assertIn("safe_current_url", source)
+        self.assertIn("data:image/webp;base64,", source)
+        self.assertIn('class="logo"', source)
+
+    def test_settings_open_when_capability_loads(self):
+        capability = pipspool.SettingsCapability()
+        opened = []
+        capability._open_settings_window = lambda: opened.append(True)
+        capability.on_load()
+        self.assertEqual(opened, [True])
 
 
 if __name__ == "__main__":
