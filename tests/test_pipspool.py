@@ -24,7 +24,7 @@ def load_plugin_module():
     requests.post = Mock()
     sys.modules["requests"] = requests
 
-    path = Path(__file__).parents[1] / "pipspool_v2_0_7_win_x86_64.py"
+    path = Path(__file__).parents[1] / "pipspool_v2_0_8_win_x86_64.py"
     spec = importlib.util.spec_from_file_location("pipspool_v2_dev", path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -148,7 +148,7 @@ class SynchronizationTests(unittest.TestCase):
         )
 
         report = pipspool.sync_profiles([self.spool()], self.profiles)
-        target = self.filament_dir / "(#42) Example PLA Basic - PipSpool.json"
+        target = self.filament_dir / "(#42) PLA Basic - Example - PipSpool.json"
 
         self.assertTrue(target.exists())
         self.assertFalse(old_path.exists())
@@ -206,8 +206,8 @@ class SynchronizationTests(unittest.TestCase):
         path = next(self.filament_dir.glob("*.json"))
         data = json.loads(path.read_text(encoding="utf-8"))
 
-        self.assertEqual(path.name, "(#42) Example PLA Basic - PipSpool.json")
-        self.assertEqual(data["name"], "(#42) Example PLA Basic - PipSpool")
+        self.assertEqual(path.name, "(#42) PLA Basic - Example - PipSpool.json")
+        self.assertEqual(data["name"], "(#42) PLA Basic - Example - PipSpool")
 
     def test_syncs_spool_level_custom_start_gcode(self):
         spool = self.spool()
@@ -224,7 +224,7 @@ class SynchronizationTests(unittest.TestCase):
 
 class ArchitectureTests(unittest.TestCase):
     def test_only_intended_capabilities_are_registered(self):
-        source = (Path(__file__).parents[1] / "pipspool_v2_0_7_win_x86_64.py").read_text(
+        source = (Path(__file__).parents[1] / "pipspool_v2_0_8_win_x86_64.py").read_text(
             encoding="utf-8"
         )
         self.assertNotIn("SlicingPipelineCapabilityBase", source)
@@ -233,7 +233,7 @@ class ArchitectureTests(unittest.TestCase):
         self.assertEqual(source.count("orca.register_capability("), 3)
 
     def test_settings_ui_has_clear_actions(self):
-        source = (Path(__file__).parents[1] / "pipspool_v2_0_7_win_x86_64.py").read_text(
+        source = (Path(__file__).parents[1] / "pipspool_v2_0_8_win_x86_64.py").read_text(
             encoding="utf-8"
         )
         self.assertIn("Test connection", source)
