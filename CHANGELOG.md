@@ -2,7 +2,7 @@
 
 All notable PipSpool changes are documented here.
 
-## [2.0.7] - 2026-08-27
+## [2.0.8] - 2026-08-27\n\n- Moved the filament material immediately after the spool number in generated profile names.\n- Changed the remaining name order to filament name, manufacturer, and PipSpool.\n- Avoided duplicate material text when the Spoolman filament name already begins with its material.\n- Existing profiles continue to be renamed by stable spool ID without creating duplicates.\n- Confirmed all 17 behavior and architecture tests pass.\n\n## [2.0.7] - 2026-08-27
 
 - Added optional per-spool Start G-code synchronized from Spoolman.
 - Automatically creates the spool-level Spoolman `start_gcode` text field when needed.
