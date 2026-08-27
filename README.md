@@ -10,7 +10,7 @@ PipSpool synchronizes active [Spoolman](https://github.com/Donkie/Spoolman) spoo
 
 - Imports active Spoolman spools as OrcaSlicer filament presets.
 - Removes generated Orca profiles when their spools are archived in Spoolman.
-- Names profiles with the spool ID first, for example `(#42) Manufacturer Filament - PipSpool`.
+- Names profiles by spool ID and material, for example `(#42) PLA Color - Manufacturer - PipSpool`.
 - Updates existing presets by stable Spoolman spool ID instead of creating duplicates after renames.
 - Preserves Orca-specific profile adjustments during synchronization.
 - Supports optional per-spool **Start G-code** stored in Spoolman.
