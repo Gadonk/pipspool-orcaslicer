@@ -19,7 +19,13 @@ jobs:
 
       - name: Validate Python syntax
         run: |
-          python -m py_compile pipspool_*.py
+          shopt -s nullglob
+          plugin_files=(pipspool_*.py)
+          if [ ${#plugin_files[@]} -eq 0 ]; then
+            echo "Bootstrap repository: no plugin source uploaded yet."
+            exit 0
+          fi
+          python -m py_compile "${plugin_files[@]}"
 
       - name: Enforce release-safe defaults on tags
         if: startsWith(github.ref, 'refs/tags/')
