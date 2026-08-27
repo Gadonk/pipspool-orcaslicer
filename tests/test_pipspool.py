@@ -5,6 +5,7 @@ import tempfile
 import types
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 
 def load_plugin_module():
@@ -18,7 +19,7 @@ def load_plugin_module():
     orca.PluginResult = types.SimpleNamespace(RecoverableError="recoverable")
     sys.modules["orca"] = orca
 
-    path = Path(__file__).parents[1] / "pipspool_v2_0_6_win_x86_64.py"
+    path = Path(__file__).parents[1] / "pipspool_v2_0_7_win_x86_64.py"
     spec = importlib.util.spec_from_file_location("pipspool_v2_dev", path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -42,6 +43,62 @@ class ManagedGCodeTests(unittest.TestCase):
         self.assertIn("SET_SPOOL_ID ID=42", result)
         self.assertNotIn("ID=8", result)
         self.assertEqual(result.count(pipspool.START_MARKER), 1)
+
+    def test_spoolman_custom_gcode_replaces_only_managed_block(self):
+        existing = [
+            "M900 K0.04\n\n"
+            f"{pipspool.START_MARKER}\n"
+            "SET_SPOOL_ID ID=8\n"
+            f"{pipspool.END_MARKER}"
+        ]
+        encoded = json.dumps("M117 Loading spool 42\nSET_ACTIVE_SPOOL ID=42")
+        result = pipspool.managed_start_gcode(existing, 42, encoded)[0]
+
+        self.assertIn("M900 K0.04", result)
+        self.assertIn("M117 Loading spool 42", result)
+        self.assertIn("SET_ACTIVE_SPOOL ID=42", result)
+        self.assertNotIn("SET_SPOOL_ID ID=8", result)
+
+    def test_blank_custom_gcode_keeps_automatic_spool_id(self):
+        result = pipspool.managed_start_gcode([], 42, json.dumps(""))[0]
+        self.assertIn("SET_SPOOL_ID ID=42", result)
+
+    def test_double_encoded_spoolman_text_is_decoded(self):
+        encoded = json.dumps(json.dumps("M117 Ready"))
+        self.assertEqual(pipspool.decode_extra_value(encoded), "M117 Ready")
+
+
+class SpoolmanClientTests(unittest.TestCase):
+    def test_creates_missing_spool_start_gcode_field(self):
+        get_response = Mock()
+        get_response.json.return_value = []
+        post_response = Mock()
+        with (
+            patch.object(pipspool.requests, "get", return_value=get_response),
+            patch.object(pipspool.requests, "post", return_value=post_response) as post,
+        ):
+            created = pipspool.SpoolmanClient("http://spoolman.test").ensure_start_gcode_field()
+
+        self.assertTrue(created)
+        get_response.raise_for_status.assert_called_once_with()
+        post_response.raise_for_status.assert_called_once_with()
+        post.assert_called_once_with(
+            "http://spoolman.test/api/v1/field/spool/start_gcode",
+            json={"name": "Start G-code", "field_type": "text", "order": 0},
+            timeout=10,
+        )
+
+    def test_keeps_existing_text_field_without_posting(self):
+        get_response = Mock()
+        get_response.json.return_value = [{"key": "start_gcode", "field_type": "text"}]
+        with (
+            patch.object(pipspool.requests, "get", return_value=get_response),
+            patch.object(pipspool.requests, "post") as post,
+        ):
+            created = pipspool.SpoolmanClient("http://spoolman.test").ensure_start_gcode_field()
+
+        self.assertFalse(created)
+        post.assert_not_called()
 
 
 class SynchronizationTests(unittest.TestCase):
@@ -147,10 +204,22 @@ class SynchronizationTests(unittest.TestCase):
         self.assertEqual(path.name, "(#42) Example PLA Basic - PipSpool.json")
         self.assertEqual(data["name"], "(#42) Example PLA Basic - PipSpool")
 
+    def test_syncs_spool_level_custom_start_gcode(self):
+        spool = self.spool()
+        spool["extra"] = {
+            "start_gcode": json.dumps("M117 Custom spool\nSET_ACTIVE_SPOOL ID=42")
+        }
+        pipspool.sync_profiles([spool], self.profiles)
+        data = json.loads(next(self.filament_dir.glob("*.json")).read_text(encoding="utf-8"))
+        start_gcode = data["filament_start_gcode"][0]
+
+        self.assertIn("M117 Custom spool", start_gcode)
+        self.assertIn("SET_ACTIVE_SPOOL ID=42", start_gcode)
+
 
 class ArchitectureTests(unittest.TestCase):
     def test_only_intended_capabilities_are_registered(self):
-        source = (Path(__file__).parents[1] / "pipspool_v2_0_6_win_x86_64.py").read_text(
+        source = (Path(__file__).parents[1] / "pipspool_v2_0_7_win_x86_64.py").read_text(
             encoding="utf-8"
         )
         self.assertNotIn("SlicingPipelineCapabilityBase", source)
@@ -159,7 +228,7 @@ class ArchitectureTests(unittest.TestCase):
         self.assertEqual(source.count("orca.register_capability("), 3)
 
     def test_settings_ui_has_clear_actions(self):
-        source = (Path(__file__).parents[1] / "pipspool_v2_0_6_win_x86_64.py").read_text(
+        source = (Path(__file__).parents[1] / "pipspool_v2_0_7_win_x86_64.py").read_text(
             encoding="utf-8"
         )
         self.assertIn("Test connection", source)
@@ -168,12 +237,21 @@ class ArchitectureTests(unittest.TestCase):
         self.assertIn("data:image/webp;base64,", source)
         self.assertIn('class="logo"', source)
 
-    def test_settings_open_when_capability_loads(self):
+    def test_settings_open_on_first_load_without_saved_settings(self):
         capability = pipspool.SettingsCapability()
         opened = []
         capability._open_settings_window = lambda: opened.append(True)
-        capability.on_load()
+        with patch.object(pipspool, "has_saved_settings", return_value=False):
+            capability.on_load()
         self.assertEqual(opened, [True])
+
+    def test_settings_stay_closed_when_configuration_is_saved(self):
+        capability = pipspool.SettingsCapability()
+        opened = []
+        capability._open_settings_window = lambda: opened.append(True)
+        with patch.object(pipspool, "has_saved_settings", return_value=True):
+            capability.on_load()
+        self.assertEqual(opened, [])
 
 
 if __name__ == "__main__":
