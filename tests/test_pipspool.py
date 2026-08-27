@@ -19,6 +19,11 @@ def load_plugin_module():
     orca.PluginResult = types.SimpleNamespace(RecoverableError="recoverable")
     sys.modules["orca"] = orca
 
+    requests = types.ModuleType("requests")
+    requests.get = Mock()
+    requests.post = Mock()
+    sys.modules["requests"] = requests
+
     path = Path(__file__).parents[1] / "pipspool_v2_0_7_win_x86_64.py"
     spec = importlib.util.spec_from_file_location("pipspool_v2_dev", path)
     module = importlib.util.module_from_spec(spec)
