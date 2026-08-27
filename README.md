@@ -1,55 +1,124 @@
 # PipSpool
 
-![PipSpool logo](assets/pipspool_logo.png)
+![PipSpool — from spool inventory to OrcaSlicer profiles](https://raw.githubusercontent.com/Gadonk/pipspool-orcaslicer/main/assets/pipspool_orcacloud_hero_v1.png)
 
-**Spoolman synchronization plugin for OrcaSlicer**
+**Spoolman synchronization for OrcaSlicer**
 
-PipSpool synchronizes active [Spoolman](https://github.com/Donkie/Spoolman) spools into OrcaSlicer filament presets. It is maintained by **Donko** and designed for printers where Klipper, Moonraker, and Happy Hare handle real-time filament usage.
+PipSpool turns every active [Spoolman](https://github.com/Donkie/Spoolman) spool
+into a clear, individual OrcaSlicer filament profile. It keeps spool identity,
+material, colour, manufacturer, temperatures and selected filament settings
+synchronized—without performing a second filament deduction.
 
-## Features
+PipSpool is maintained by **Donko** and designed for printers where Klipper,
+Moonraker, Happy Hare or another Spoolman integration already handles real-time
+filament usage.
 
-- Imports active Spoolman spools as OrcaSlicer filament presets.
-- Removes generated Orca profiles when their spools are archived in Spoolman.
-- Names profiles by spool ID and material, for example `(#42) PLA Color - Manufacturer - PipSpool`.
-- Updates existing presets by stable Spoolman spool ID instead of creating duplicates after renames.
-- Preserves Orca-specific profile adjustments during synchronization.
-- Supports optional per-spool **Start G-code** stored in Spoolman.
-- Falls back to `SET_SPOOL_ID ID=<id>` when a spool has no custom Start G-code.
-- Uses Spoolman's nozzle and bed temperatures for Orca's nozzle and all supported build-plate temperature fields.
-- Can synchronize selected Orca Filament, Cooling, and Multimaterial parameters through Spoolman.
-- Provides a grouped, opt-in Plugin configuration checklist, with no advanced fields selected by default.
-- Can explicitly remove obsolete unselected PipSpool fields after showing a data-loss warning.
-- Adds an integrated PipSpool page with connection health, Happy/Sad Pip artwork, active-spool overview, searchable spool list, and last synchronization report.
-- Provides live **Refresh** and **Synchronize now** actions plus advanced-field selection and deliberate cleanup controls directly on the PipSpool page.
-- Opens the setup dialog automatically only when no valid PipSpool settings have been saved.
-- Includes an offline embedded PipSpool logo and a connection test.
-- Does not deduct filament during G-code export.
-- Does not create duplicate `- SpoolMan` process profiles.
-- Includes focused cleanup for artifacts created by older bridge versions.
+## At a glance
+
+- One OrcaSlicer filament profile for each active Spoolman spool.
+- Stable spool-ID matching, so updates and renames do not create duplicates.
+- Automatic removal of the matching profile when a spool is archived.
+- Sortable names such as `(#42) PLA Galaxy Blue - Manufacturer - PipSpool`.
+- Nozzle and bed temperatures imported from the correct Spoolman material.
+- Automatic `SET_SPOOL_ID ID=42` or optional per-spool custom Start G-code.
+- Optional Orca-master synchronization for selected Filament, Cooling and
+  Multimaterial fields.
+- No slicer-side filament deduction and no duplicate process profiles.
+
+## PipSpool dashboard
+
+The integrated PipSpool page brings daily controls and useful information into
+one place:
+
+- Clear connection health with Happy or Sad Pip artwork.
+- Searchable active-spool overview with remaining weight.
+- **Refresh** and **Synchronize now** actions.
+- Last synchronization metrics, report and visible errors.
+- Grouped selection of advanced Filament, Cooling and Multimaterial fields.
+- Deliberate cleanup controls for obsolete PipSpool fields.
+
+Advanced field synchronization is opt-in. No advanced fields are selected by
+default, and ordinary spool details, temperatures and spool-ID G-code continue
+to work without enabling it.
+
+## Install and connect
+
+### Orca Cloud
+
+1. Subscribe to **PipSpool** in Orca Cloud.
+2. In OrcaSlicer, open **File → Plugins**.
+3. Select **Refresh**, then activate **PipSpool**.
+4. Enter the complete address of your Spoolman server—for example,
+   `http://192.168.1.50:7912`.
+5. Select **Test connection**, then **Save settings**.
+6. Open the **PipSpool** page and select **Synchronize now**.
+7. Restart OrcaSlicer when the report says filament profiles changed.
+
+### Manual installation
+
+1. Download the Windows `pipspool_v*_win_x86_64.py` file from the
+   [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
+2. Open **File → Plugins** in OrcaSlicer.
+3. Choose **Install local plugin** and select the downloaded file.
+4. Activate PipSpool and follow the connection steps above.
+
+The setup window opens automatically only when no valid settings have been
+saved. It remains available through PipSpool's setup action.
+
+> Do not run PipSpool alongside another plugin that creates Orca profiles from
+> the same Spoolman spools.
+
+## How synchronization works
+
+PipSpool matches generated profiles by numeric Spoolman ID. Adding, editing or
+archiving a spool therefore updates the correct Orca profile instead of creating
+another copy.
+
+Generated profiles use this order:
+
+```text
+(#spool) MATERIAL Filament name - Manufacturer - PipSpool
+```
+
+PipSpool preserves unrelated Orca-specific profile adjustments. When advanced
+field synchronization is enabled, OrcaSlicer is the master for the selected
+Filament, Cooling and Multimaterial values.
+
+## Features I’m working on
+
+These are active areas of investigation and improvement, not release promises:
+
+- Reloading changed filament profiles inside OrcaSlicer without requiring a
+  restart, if the evolving plugin API provides a safe supported method.
+- More useful dashboard feedback and controls while keeping the page simple.
+- Broader compatibility testing as OrcaSlicer's plugin API changes.
+- Improving material-profile matching and advanced-field coverage based on
+  real-world filament libraries.
+- Evaluating additional operating-system packages after the Windows version is
+  stable and testable on those platforms.
+
+Suggestions and reproducible test cases are welcome in
+[GitHub Issues](https://github.com/Gadonk/pipspool-orcaslicer/issues).
 
 ## Compatibility
 
-PipSpool 2.2.0 is confirmed on OrcaSlicer 2.5.0 nightly build `142c63ab` on Windows x86-64 with Spoolman, Klipper, Moonraker, and Happy Hare.
+PipSpool 2.2.0 is confirmed on OrcaSlicer 2.5.0 nightly build `142c63ab` on
+Windows x86-64 with Spoolman, Klipper, Moonraker and Happy Hare.
 
-OrcaSlicer's Python plugin API is new and may change in future OrcaSlicer builds.
+OrcaSlicer's Python plugin API is new and may change in future builds.
 
-## Installation
+## Privacy and release safety
 
-1. Download [`pipspool_v2_2_0_win_x86_64.py`](pipspool_v2_2_0_win_x86_64.py).
-2. Open **File → Plugins** in OrcaSlicer.
-3. Choose **Install local plugin** and select the Python file.
-4. Activate PipSpool. On first setup, its settings dialog opens automatically.
-5. Enter the address of your Spoolman server, use **Test connection**, and save.
-6. Run **Sync Spoolman Profiles**, then restart OrcaSlicer to load changed presets.
-
-Do not enable PipSpool and an older Spoolman synchronization plugin simultaneously.
-
-## Release safety
-
-The public source defaults to `http://localhost:7912`. Configure the actual Spoolman server address in PipSpool Settings. GitHub Actions rejects private development addresses.
+PipSpool connects only to the Spoolman address saved in its settings. The public
+source defaults to `http://localhost:7912`; configure your actual server address
+during setup. GitHub Actions rejects private development addresses from release
+artifacts.
 
 ## License
 
-PipSpool is maintained and copyrighted by **Donko** and distributed under the [MIT License](LICENSE).
+PipSpool is maintained and copyrighted by **Donko** and distributed under the
+[MIT License](LICENSE).
 
-The PipSpool logo is original artwork based on Donko's Pip character and an independently designed filament-spool/database motif. It does not reproduce the official Spoolman logo or wordmark.
+The PipSpool logo is original artwork based on Donko's Pip character and an
+independently designed filament-spool/database motif. It does not reproduce the
+official Spoolman logo or wordmark.
