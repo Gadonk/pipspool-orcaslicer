@@ -2,6 +2,16 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.0.7] - 2026-08-27
+
+- Added optional per-spool Start G-code synchronized from Spoolman.
+- Automatically creates the spool-level Spoolman `start_gcode` text field when needed.
+- Falls back to the managed `SET_SPOOL_ID ID=<id>` command when custom Start G-code is blank.
+- Preserves unrelated OrcaSlicer filament Start G-code while updating PipSpool's managed block.
+- Added compatibility with JSON-encoded and double-encoded Spoolman extra-field values.
+- Changed automatic setup so the settings window opens only when no valid saved configuration exists.
+- Expanded automated verification to 17 behavior and architecture tests.
+
 ## [2.0.6] - 2026-08-27
 
 - Released the first stable PipSpool improvement build for Windows x86-64.
