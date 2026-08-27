@@ -18,7 +18,7 @@ def load_plugin_module():
     orca.PluginResult = types.SimpleNamespace(RecoverableError="recoverable")
     sys.modules["orca"] = orca
 
-    path = Path(__file__).parents[1] / "pipspool_v2_0_5_dev.py"
+    path = Path(__file__).parents[1] / "pipspool_v2_0_6_win_x86_64.py"
     spec = importlib.util.spec_from_file_location("pipspool_v2_dev", path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -86,7 +86,7 @@ class SynchronizationTests(unittest.TestCase):
         )
 
         report = pipspool.sync_profiles([self.spool()], self.profiles)
-        target = self.filament_dir / "Example PLA Basic (#42) - PipSpool.json"
+        target = self.filament_dir / "(#42) Example PLA Basic - PipSpool.json"
 
         self.assertTrue(target.exists())
         self.assertFalse(old_path.exists())
@@ -128,10 +128,29 @@ class SynchronizationTests(unittest.TestCase):
         self.assertEqual(list(self.filament_dir.glob("*.json")), [])
         self.assertEqual(report.removed, 1)
 
+    def test_archived_spool_is_removed_from_orca(self):
+        pipspool.sync_profiles([self.spool()], self.profiles)
+        archived = self.spool()
+        archived["archived"] = True
+
+        report = pipspool.sync_profiles([archived], self.profiles)
+
+        self.assertEqual(list(self.filament_dir.glob("*.json")), [])
+        self.assertEqual(report.active_spools, 0)
+        self.assertEqual(report.removed, 1)
+
+    def test_profile_name_starts_with_spool_id_for_sorting(self):
+        pipspool.sync_profiles([self.spool()], self.profiles)
+        path = next(self.filament_dir.glob("*.json"))
+        data = json.loads(path.read_text(encoding="utf-8"))
+
+        self.assertEqual(path.name, "(#42) Example PLA Basic - PipSpool.json")
+        self.assertEqual(data["name"], "(#42) Example PLA Basic - PipSpool")
+
 
 class ArchitectureTests(unittest.TestCase):
     def test_only_intended_capabilities_are_registered(self):
-        source = (Path(__file__).parents[1] / "pipspool_v2_0_5_dev.py").read_text(
+        source = (Path(__file__).parents[1] / "pipspool_v2_0_6_win_x86_64.py").read_text(
             encoding="utf-8"
         )
         self.assertNotIn("SlicingPipelineCapabilityBase", source)
@@ -140,7 +159,7 @@ class ArchitectureTests(unittest.TestCase):
         self.assertEqual(source.count("orca.register_capability("), 3)
 
     def test_settings_ui_has_clear_actions(self):
-        source = (Path(__file__).parents[1] / "pipspool_v2_0_5_dev.py").read_text(
+        source = (Path(__file__).parents[1] / "pipspool_v2_0_6_win_x86_64.py").read_text(
             encoding="utf-8"
         )
         self.assertIn("Test connection", source)
