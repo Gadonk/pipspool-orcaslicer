@@ -6,7 +6,7 @@
 
 PipSpool synchronizes active [Spoolman](https://github.com/Donkie/Spoolman) spools into OrcaSlicer filament presets. It is maintained by **Donko** and designed for printers where Klipper, Moonraker, and Happy Hare handle real-time filament usage.
 
-## Current development features
+## PipSpool 2.0 development features
 
 - Imports active Spoolman spools as OrcaSlicer filament presets.
 - Updates existing presets by stable Spoolman spool ID instead of creating duplicates after renames.
@@ -15,6 +15,7 @@ PipSpool synchronizes active [Spoolman](https://github.com/Donkie/Spoolman) spoo
 - Does not deduct filament during G-code export.
 - Does not create duplicate `- SpoolMan` process profiles.
 - Includes focused cleanup for artifacts created by older bridge versions.
+- Uses a clean implementation built around public OrcaSlicer, Spoolman, and Moonraker interfaces.
 
 ## Compatibility
 
@@ -24,20 +25,22 @@ OrcaSlicer's Python plugin API is experimental. Test development builds before p
 
 ## Development installation
 
-1. Download the latest versioned `pipspool_*_dev.py` file.
+1. Download [`pipspool_v2_0_0_dev.py`](pipspool_v2_0_0_dev.py).
 2. Open **File → Plugins** in OrcaSlicer.
 3. Choose **Install local plugin** and select the Python file.
 4. Activate PipSpool and restart OrcaSlicer when requested.
-5. Configure the Spoolman URL and run **Sync Spoolman Profiles**.
+5. Open **PipSpool Settings**, configure the Spoolman URL, and run **Sync Spoolman Profiles**.
 
 Do not enable PipSpool and the older Spoolman Bridge plugin simultaneously.
 
 ## Release safety
 
-Development builds may use a private development Spoolman address. Publishable releases must restore the default to `http://localhost:7912`.
+The public source uses `http://localhost:7912`. GitHub Actions blocks tagged releases if a private development address is present.
 
-## License and attribution
+## Provenance and license
 
-PipSpool is derived from Zao Soula's [OrcaSlicer Spoolman Bridge](https://github.com/zaosoula/orcaslicer-plugin-spoolman), licensed under the MIT License. The original copyright and permission notice are retained in [LICENSE](LICENSE).
+PipSpool 2.0 is a clean architectural replacement for the inherited 1.1.x development line. Its documented comparison found no substantial matching algorithmic block. See [PROVENANCE.md](PROVENANCE.md) for the implementation boundaries, comparison results, and tests.
+
+The repository currently retains the earlier MIT notice while the maintainer completes the final licensing reassessment. Historical inherited builds are not distributed from this repository.
 
 The PipSpool logo is original artwork based on Donko's Pip character and an independently designed filament-spool/database motif. It does not reproduce the official Spoolman logo or wordmark.
