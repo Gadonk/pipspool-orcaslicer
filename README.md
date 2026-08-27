@@ -24,13 +24,13 @@ PipSpool synchronizes active [Spoolman](https://github.com/Donkie/Spoolman) spoo
 
 ## Compatibility
 
-PipSpool 2.0.7 is confirmed on OrcaSlicer 2.5.0 nightly build `142c63ab` on Windows x86-64 with Spoolman, Klipper, Moonraker, and Happy Hare.
+PipSpool 2.0.8 is confirmed on OrcaSlicer 2.5.0 nightly build `142c63ab` on Windows x86-64 with Spoolman, Klipper, Moonraker, and Happy Hare.
 
 OrcaSlicer's Python plugin API is new and may change in future OrcaSlicer builds.
 
 ## Installation
 
-1. Download [`pipspool_v2_0_7_win_x86_64.py`](pipspool_v2_0_7_win_x86_64.py).
+1. Download [`pipspool_v2_0_8_win_x86_64.py`](pipspool_v2_0_8_win_x86_64.py).
 2. Open **File → Plugins** in OrcaSlicer.
 3. Choose **Install local plugin** and select the Python file.
 4. Activate PipSpool. On first setup, its settings dialog opens automatically.
