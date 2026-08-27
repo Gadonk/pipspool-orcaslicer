@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "pipspool_v*_win_x86_64.py"
+      - ".github/workflows/create-release.yml"
 
 permissions:
   contents: write
