@@ -1,0 +1,57 @@
+name: Create GitHub Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "pipspool_v*_win_x86_64.py"
+      - ".github/workflows/create-release.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+
+      - name: Create or update release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(pipspool_v*_win_x86_64.py)
+          if [ "${#files[@]}" -ne 1 ]; then
+            echo "Expected exactly one plugin artifact, found ${#files[@]}" >&2
+            exit 1
+          fi
+
+          file="${files[0]}"
+          version="$(sed -n 's/^# version = "\([^"]*\)"/\1/p' "$file")"
+          if [ -z "$version" ] || [[ "$version" == *-dev ]]; then
+            echo "Invalid stable version metadata: $version" >&2
+            exit 1
+          fi
+          tag="v${version}"
+
+          awk -v version="$version" '
+            index($0, "## [" version "] - ") == 1 { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "No CHANGELOG section found for $version" >&2
+            exit 1
+          fi
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$file" --clobber
+            gh release edit "$tag" --title "PipSpool $version" --notes-file release-notes.md
+          else
+            gh release create "$tag" "$file" --target "$GITHUB_SHA" \
+              --title "PipSpool $version" --notes-file release-notes.md
+          fi
