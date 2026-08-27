@@ -1,6 +1,6 @@
 # PipSpool
 
-(https://raw.githubusercontent.com/Gadonk/pipspool-orcaslicer/main/assets/pipspool_orcacloud_hero_v1.png)
+![PipSpool — from spool inventory to OrcaSlicer profiles](https://raw.githubusercontent.com/Gadonk/pipspool-orcaslicer/main/assets/pipspool_orcacloud_hero_v1.png)
 
 **Spoolman synchronization for OrcaSlicer**
 
