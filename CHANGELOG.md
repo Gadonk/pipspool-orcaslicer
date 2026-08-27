@@ -2,6 +2,16 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.0.6] - 2026-08-27
+
+- Released the first stable PipSpool improvement build for Windows x86-64.
+- Adopted Orca Cloud's target-platform filename convention.
+- Removed development markers from the release filename and plugin metadata.
+- Removed generated Orca profiles when their Spoolman spools are archived.
+- Added a defensive client-side archive check in addition to `allow_archived=false`.
+- Moved the spool number to the beginning of profile names for spool-ID sorting.
+- Confirmed all ten behavior and architecture tests pass.
+
 ## [2.0.5-dev] - 2026-08-27
 
 - Published the working clean 2.0 development build confirmed on OrcaSlicer nightly `142c63ab` for Windows.
@@ -18,11 +28,11 @@ All notable PipSpool changes are documented here.
 
 ## [1.1.4-dev] - 2026-08-27
 
-- Rebranded the maintained fork as PipSpool.
+- Rebranded the maintained plugin as PipSpool.
 - Added an original PipSpool logo.
 - Added stable spool-ID preset updating and rename migration.
 - Added managed `SET_SPOOL_ID ID=<id>` filament start G-code.
 - Removed Orca-side filament deduction.
-- Removed duplicate SpoolMan process-profile generation.
+- Removed duplicate process-profile generation.
 - Added focused cleanup for legacy pipeline profiles and references.
 - Centralized the development Spoolman URL with a release reminder.
