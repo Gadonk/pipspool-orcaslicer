@@ -35,8 +35,8 @@ jobs:
           grep -Fqx '# dependencies = ["requests"]' "${files[0]}"
           grep -Fqx 'DEFAULT_SPOOLMAN_URL = "http://localhost:7912"' "${files[0]}"
 
-          if grep -Fq '192.168.0.3' "${files[0]}"; then
-            echo "Private development Spoolman address found." >&2
+          if grep -Eq 'https?://(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.)' "${files[0]}"; then
+            echo "Private-network Spoolman address found." >&2
             exit 1
           fi
           if grep -Fq -- '-dev' "${files[0]}"; then
