@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release:
@@ -55,3 +56,31 @@ jobs:
             gh release create "$tag" "$file" --target "$GITHUB_SHA" \
               --title "PipSpool $version" --notes-file release-notes.md
           fi
+
+      - name: Publish release to OrcaCloud
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(pipspool_v*_win_x86_64.py)
+          if [ "${#files[@]}" -ne 1 ]; then
+            echo "Expected exactly one plugin artifact, found ${#files[@]}" >&2
+            exit 1
+          fi
+
+          file="${files[0]}"
+          version="$(sed -n 's/^# version = "\([^"]*\)"/\1/p' "$file")"
+          changelog="$(head -c 4000 release-notes.md)"
+          metadata="$(jq -cn --arg version "$version" --arg changelog "$changelog" \
+            '{version: $version, changelog: $changelog}')"
+          oidc_token="$(curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=orcacloud" | jq -r .value)"
+
+          status="$(curl -sS -o response.json -w '%{http_code}' \
+            -H "Authorization: Bearer $oidc_token" \
+            -F "metadata=$metadata" \
+            -F "files=@$file" \
+            https://api.orcaslicer.com/api/v1/plugin-publish/releases)"
+          cat response.json
+          echo
+          [ "$status" = "201" ]
