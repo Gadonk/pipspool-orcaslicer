@@ -2,6 +2,19 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.0] - 2026-08-27
+
+- Added an integrated PipSpool page to OrcaSlicer's main interface.
+- Added clear green/red connection artwork with Happy and Sad Pip states.
+- Added live connection status, active-spool count, and a searchable spool table.
+- Added **Refresh** and **Synchronize now** actions with an immediate synchronization report.
+- Added page controls for Filament, Cooling, and Multimaterial field selection.
+- Added deliberate cleanup controls for obsolete unselected PipSpool fields.
+- Rendered initial data directly from Python so the page remains informative before its live bridge initializes.
+- Repaired the page's generated JavaScript newline escaping, which had prevented all interactive controls from loading.
+- Reworked the page script for compatibility with OrcaSlicer's Windows webview backend.
+- Confirmed all 33 behavior, dashboard, configuration, and architecture tests pass.
+
 ## [2.1.0] - 2026-08-27
 
 - Added Orca-master synchronization for selected Filament, Cooling, and Multimaterial settings.
