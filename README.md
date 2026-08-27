@@ -43,12 +43,6 @@ Do not enable PipSpool and an older Spoolman synchronization plugin simultaneous
 
 The public source defaults to `http://localhost:7912`. Configure the actual Spoolman server address in PipSpool Settings. GitHub Actions rejects private development addresses.
 
-## Automatic Orca Cloud publishing
-
-GitHub Releases are published automatically to Orca Cloud through trusted OIDC publishing. No permanent token or repository secret is used.
-
-The repository is connected to the PipSpool listing in Orca Cloud. Publishing a GitHub Release with a matching semantic-version tag automatically publishes that version and its GitHub release notes to Orca Cloud.
-
 ## License
 
 PipSpool is maintained and copyrighted by **Donko** and distributed under the [MIT License](LICENSE).
