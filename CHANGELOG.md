@@ -11,6 +11,7 @@ All notable PipSpool changes are documented here.
 - Added a defensive client-side archive check in addition to `allow_archived=false`.
 - Moved the spool number to the beginning of profile names for spool-ID sorting.
 - Confirmed all ten behavior and architecture tests pass.
+- Added trusted GitHub Release publishing to Orca Cloud with OIDC and release-safety checks.
 
 ## [2.0.5-dev] - 2026-08-27
 
