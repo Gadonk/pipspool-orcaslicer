@@ -46,7 +46,7 @@ The public source defaults to `http://localhost:7912`. Configure the actual Spoo
 
 GitHub Releases are published automatically to Orca Cloud through trusted OIDC publishing. No permanent token or repository secret is used.
 
-The repository must first be connected from the PipSpool listing under **Orca Cloud → Shared Plugins → Edit plugin → GitHub publishing**. See [RELEASING.md](RELEASING.md) for the one-time connection and future release checklist.
+The repository is connected to the PipSpool listing in Orca Cloud. Publishing a GitHub Release with a matching semantic-version tag automatically publishes that version to Orca Cloud.
 
 ## License
 
