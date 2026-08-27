@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - "pipspool_v*_win_x86_64.py"
-      - ".github/workflows/create-release.yml"
 
 permissions:
   contents: write
@@ -49,7 +48,9 @@ jobs:
           fi
 
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release delete "$tag" --cleanup-tag --yes
+            gh release upload "$tag" "$file" --clobber
+            gh release edit "$tag" --draft --title "PipSpool $version" --notes-file release-notes.md
+          else
+            gh release create "$tag" "$file" --target "$GITHUB_SHA" \
+              --draft --title "PipSpool $version" --notes-file release-notes.md
           fi
-          gh release create "$tag" "$file" --target "$GITHUB_SHA" \
-            --draft --title "PipSpool $version" --notes-file release-notes.md
