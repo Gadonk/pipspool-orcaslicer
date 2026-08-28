@@ -31,8 +31,11 @@ The integrated PipSpool page brings daily controls and useful information into
 one place:
 
 - Clear connection health with Happy or Sad Pip artwork.
-- Searchable active-spool overview with remaining weight.
-- **Refresh** and **Synchronize now** actions.
+- Searchable active-spool overview with remaining weight, nozzle temperature and
+  bed temperature.
+- Colour-aware **Printer Gates/Toolheads** overview using assignments already
+  reported by Spoolman.
+- **Feedback**, **Refresh** and **Synchronize now** actions.
 - Last synchronization metrics, report and visible errors.
 - Grouped selection of advanced Filament, Cooling and Multimaterial fields.
 - Deliberate cleanup controls for obsolete PipSpool fields.
@@ -102,7 +105,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.0 is confirmed on OrcaSlicer 2.5.0 nightly build `142c63ab` on
+PipSpool 2.2.1 is confirmed on OrcaSlicer 2.5.0 nightly build `142c63ab` on
 Windows x86-64 with Spoolman, Klipper, Moonraker and Happy Hare.
 
 OrcaSlicer's Python plugin API is new and may change in future builds.

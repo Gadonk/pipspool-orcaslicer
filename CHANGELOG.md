@@ -2,6 +2,20 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.1] - 2026-08-28
+
+- Added a colour-aware Printer Gates/Toolheads overview based entirely on gate assignments already stored in Spoolman.
+- Added compact toolhead tiles with gate number, spool number, material, printer name and remaining weight, arranged eight per row with support for larger systems.
+- Added nozzle and bed temperatures to the searchable Active spools table.
+- Added PipSpool's native pinstripe icon to the OrcaSlicer page tab.
+- Reworked the dashboard into a deep navy and electric-blue Pip theme, including a full-height page background and a 75/25 Active spools/Last synchronization layout.
+- Added a direct Feedback action that opens PipSpool GitHub Issues in the user's default browser.
+- Added clear, stable connection-loss text instead of exposing raw HTTP exceptions.
+- Added version, copyright and project information to the dashboard footer.
+- Improved the first-open and refresh handshake so connection state and spool data populate reliably.
+- Added regression protection for stable metadata, runtime version and the public localhost default.
+- Confirmed all 44 synchronization, dashboard, configuration, packaging and architecture tests pass.
+
 ## [2.2.0] - 2026-08-27
 
 - Added an integrated PipSpool page to OrcaSlicer's main interface.
