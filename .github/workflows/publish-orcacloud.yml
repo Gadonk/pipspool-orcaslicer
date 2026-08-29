@@ -8,9 +8,6 @@ permissions:
   id-token: write
   contents: read
 
-env:
-  PLUGIN_FILES: "pipspool_v*_win_x86_64.py"
-
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -23,13 +20,14 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          files=($PLUGIN_FILES)
+          version="${GITHUB_REF_NAME#v}"
+          file_version="${version//./_}"
+          files=(pipspool_v"${file_version}"*_win_x86_64.py)
           if [ "${#files[@]}" -ne 1 ]; then
-            echo "Expected exactly one release plugin file, found ${#files[@]}: ${files[*]-}" >&2
+            echo "Expected exactly one plugin file for ${version}, found ${#files[@]}: ${files[*]-}" >&2
             exit 1
           fi
-
-          version="${GITHUB_REF_NAME#v}"
+          echo "PLUGIN_FILES=${files[0]}" >> "$GITHUB_ENV"
           expected_metadata="# version = \"${version}\""
           grep -Fqx "$expected_metadata" "${files[0]}"
           grep -Fqx '# dependencies = ["requests"]' "${files[0]}"
