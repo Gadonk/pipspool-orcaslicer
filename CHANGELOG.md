@@ -2,6 +2,18 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.4] - 2026-08-30
+
+- Added a compact **Columns** menu to the Active spools table.
+- Added saved visibility choices for Filament, Manufacturer, Colour, Nozzle, Bed and Remaining.
+- Added Spoolman Location as an optional searchable column, hidden by default.
+- Kept Spool and Material permanently visible for a clear minimum table layout.
+- Fixed synchronization freezing after changing visible columns.
+- Fixed unchecked columns remaining visible until the page was reopened.
+- Kept Active spools column headings visible while scrolling through the spool list.
+- Added stable packages for Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon.
+- Confirmed all 66 synchronization, dashboard, configuration, packaging and architecture tests pass.
+
 ## [2.2.3] - 2026-08-30
 
 - Added optional dashboard visibility while keeping all core synchronization actions active.

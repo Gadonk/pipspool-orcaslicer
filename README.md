@@ -33,6 +33,11 @@ one place:
 - Clear connection health with Happy or Sad Pip artwork.
 - Searchable active-spool overview with remaining weight, nozzle temperature and
   bed temperature.
+- A compact **Columns** menu with saved visibility choices for Filament,
+  Manufacturer, Colour, Nozzle, Bed and Remaining.
+- Optional searchable Spoolman Location column, hidden by default.
+- Sticky table headings that remain visible while scrolling through active
+  spools.
 - Colour-aware **Printer Gates/Toolheads** overview using assignments already
   reported by Spoolman.
 - **Feedback**, **Refresh** and **Synchronize now** actions.
@@ -109,7 +114,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.3 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.4 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is confirmed on OrcaSlicer 2.5.0 nightly build
 `db29f570` on Windows x86-64 with Spoolman, Klipper, Moonraker and Happy Hare.
 

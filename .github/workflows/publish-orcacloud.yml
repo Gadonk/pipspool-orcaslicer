@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   publish:
+    # 2.2.4 is being entered manually in Orca Cloud while the previous update
+    # is still awaiting review. Later releases continue to publish normally.
+    if: github.event.release.tag_name != 'v2.2.4'
     runs-on: ubuntu-latest
     steps:
       - name: Check out release
