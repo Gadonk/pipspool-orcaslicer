@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "pipspool_v*.py"
+      - ".github/workflows/create-release.yml"
 
 permissions:
   contents: write
@@ -23,16 +24,17 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          mapfile -t files < <(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" \
-            | grep -E '^pipspool_v.*_(win_x86_64|linux_x86_64|linux_arm64|macosx_x86_64|macosx_arm64)\.py$' \
-            | sort)
+          version="$(for artifact in pipspool_v*.py; do
+            sed -n 's/^# version = "\([0-9][0-9.]*\)"/\1/p' "$artifact"
+          done | sort -V | tail -n 1)"
+          file_version="${version//./_}"
+          files=(pipspool_v"${file_version}"_*.py)
           if [ "${#files[@]}" -ne 5 ]; then
-            echo "Expected five platform artifacts in the release commit, found ${#files[@]}" >&2
+            echo "Expected five platform artifacts for ${version}, found ${#files[@]}" >&2
             exit 1
           fi
 
           file="${files[0]}"
-          version="$(sed -n 's/^# version = "\([^"]*\)"/\1/p' "$file")"
           if [ -z "$version" ] || [[ "$version" == *-dev* ]]; then
             echo "Invalid stable version metadata: $version" >&2
             exit 1
@@ -54,8 +56,8 @@ jobs:
 
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "${files[@]}" --clobber
-            gh release edit "$tag" --draft --title "PipSpool $version" --notes-file release-notes.md
+            gh release edit "$tag" --draft=false --title "PipSpool $version" --notes-file release-notes.md
           else
             gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" \
-              --draft --title "PipSpool $version" --notes-file release-notes.md
+              --title "PipSpool $version" --notes-file release-notes.md
           fi
