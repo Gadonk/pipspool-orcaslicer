@@ -37,6 +37,10 @@ one place:
   reported by Spoolman.
 - **Feedback**, **Refresh** and **Synchronize now** actions.
 - Last synchronization metrics, report and visible errors.
+- A detailed change list showing which spool profiles and fields were updated.
+- Optional page visibility without disabling PipSpool's core synchronization.
+- Remaining-weight gauges, configurable low-filament warnings, duplicate-gate
+  warnings and per-spool profile health on gate/toolhead tiles.
 - Grouped selection of advanced Filament, Cooling and Multimaterial fields.
 - Deliberate cleanup controls for obsolete PipSpool fields.
 
@@ -59,7 +63,7 @@ to work without enabling it.
 
 ### Manual installation
 
-1. Download the Windows `pipspool_v*_win_x86_64.py` file from the
+1. Download the `.py` file matching your operating system and CPU from the
    [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
 2. Open **File → Plugins** in OrcaSlicer.
 3. Choose **Install local plugin** and select the downloaded file.
@@ -97,16 +101,17 @@ These are active areas of investigation and improvement, not release promises:
 - Broader compatibility testing as OrcaSlicer's plugin API changes.
 - Improving material-profile matching and advanced-field coverage based on
   real-world filament libraries.
-- Evaluating additional operating-system packages after the Windows version is
-  stable and testable on those platforms.
+- Refining cross-platform diagnostics based on Windows, Linux and macOS user
+  feedback.
 
 Suggestions and reproducible test cases are welcome in
 [GitHub Issues](https://github.com/Gadonk/pipspool-orcaslicer/issues).
 
 ## Compatibility
 
-PipSpool 2.2.1 is confirmed on OrcaSlicer 2.5.0 nightly build `142c63ab` on
-Windows x86-64 with Spoolman, Klipper, Moonraker and Happy Hare.
+PipSpool 2.2.3 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+and macOS Apple Silicon. It is confirmed on OrcaSlicer 2.5.0 nightly build
+`db29f570` on Windows x86-64 with Spoolman, Klipper, Moonraker and Happy Hare.
 
 OrcaSlicer's Python plugin API is new and may change in future builds.
 

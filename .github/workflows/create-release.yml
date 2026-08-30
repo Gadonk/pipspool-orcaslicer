@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "pipspool_v*_win_x86_64.py"
+      - "pipspool_v*.py"
 
 permissions:
   contents: write
@@ -23,18 +23,23 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          files=(pipspool_v*_win_x86_64.py)
-          if [ "${#files[@]}" -ne 1 ]; then
-            echo "Expected exactly one plugin artifact, found ${#files[@]}" >&2
+          mapfile -t files < <(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" \
+            | grep -E '^pipspool_v.*_(win_x86_64|linux_x86_64|linux_arm64|macosx_x86_64|macosx_arm64)\.py$' \
+            | sort)
+          if [ "${#files[@]}" -ne 5 ]; then
+            echo "Expected five platform artifacts in the release commit, found ${#files[@]}" >&2
             exit 1
           fi
 
           file="${files[0]}"
           version="$(sed -n 's/^# version = "\([^"]*\)"/\1/p' "$file")"
-          if [ -z "$version" ] || [[ "$version" == *-dev ]]; then
+          if [ -z "$version" ] || [[ "$version" == *-dev* ]]; then
             echo "Invalid stable version metadata: $version" >&2
             exit 1
           fi
+          for artifact in "${files[@]}"; do
+            grep -Fqx "# version = \"${version}\"" "$artifact"
+          done
           tag="v${version}"
 
           awk -v version="$version" '
@@ -48,9 +53,9 @@ jobs:
           fi
 
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "$file" --clobber
+            gh release upload "$tag" "${files[@]}" --clobber
             gh release edit "$tag" --draft --title "PipSpool $version" --notes-file release-notes.md
           else
-            gh release create "$tag" "$file" --target "$GITHUB_SHA" \
+            gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" \
               --draft --title "PipSpool $version" --notes-file release-notes.md
           fi

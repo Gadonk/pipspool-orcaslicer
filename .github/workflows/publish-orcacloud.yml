@@ -22,25 +22,30 @@ jobs:
           shopt -s nullglob
           version="${GITHUB_REF_NAME#v}"
           file_version="${version//./_}"
-          files=(pipspool_v"${file_version}"*_win_x86_64.py)
-          if [ "${#files[@]}" -ne 1 ]; then
-            echo "Expected exactly one plugin file for ${version}, found ${#files[@]}: ${files[*]-}" >&2
+          files=(pipspool_v"${file_version}"_*.py)
+          if [ "${#files[@]}" -ne 5 ]; then
+            echo "Expected five platform files for ${version}, found ${#files[@]}: ${files[*]-}" >&2
             exit 1
           fi
-          echo "PLUGIN_FILES=${files[0]}" >> "$GITHUB_ENV"
           expected_metadata="# version = \"${version}\""
-          grep -Fqx "$expected_metadata" "${files[0]}"
-          grep -Fqx '# dependencies = ["requests"]' "${files[0]}"
-          grep -Fqx 'DEFAULT_SPOOLMAN_URL = "http://localhost:7912"' "${files[0]}"
-
-          if grep -Eq 'https?://(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.)' "${files[0]}"; then
-            echo "Private-network Spoolman address found." >&2
-            exit 1
-          fi
-          if grep -Fq -- '-dev' "${files[0]}"; then
-            echo "Development marker found in stable release artifact." >&2
-            exit 1
-          fi
+          for file in "${files[@]}"; do
+            grep -Fqx "$expected_metadata" "$file"
+            grep -Fqx '# dependencies = ["requests"]' "$file"
+            grep -Fqx 'DEFAULT_SPOOLMAN_URL = "http://localhost:7912"' "$file"
+            if grep -Eq 'https?://(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.)' "$file"; then
+              echo "Private-network Spoolman address found in $file." >&2
+              exit 1
+            fi
+            if grep -Fq -- '-dev' "$file"; then
+              echo "Development marker found in $file." >&2
+              exit 1
+            fi
+          done
+          {
+            echo 'PLUGIN_FILES<<EOF'
+            printf '%s\n' "${files[@]}"
+            echo EOF
+          } >> "$GITHUB_ENV"
 
       - name: Publish release to OrcaCloud
         shell: bash

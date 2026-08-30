@@ -2,6 +2,17 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.3] - 2026-08-30
+
+- Added optional dashboard visibility while keeping all core synchronization actions active.
+- Added configurable low-filament warnings and compact remaining-weight gauges to gate/toolhead tiles.
+- Added duplicate gate-assignment warnings with clear hover explanations.
+- Added per-spool profile health for synced, missing, outdated and error states.
+- Added detailed synchronization bullets describing which profiles and fields changed.
+- Preserved exact custom Spoolman material types, including arbitrary names such as PLA-XS.
+- Added stable packages for Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon.
+- Confirmed all 62 synchronization, dashboard, configuration, packaging and architecture tests pass.
+
 ## [2.2.1] - 2026-08-28
 
 - Added a colour-aware Printer Gates/Toolheads overview based entirely on gate assignments already stored in Spoolman.
