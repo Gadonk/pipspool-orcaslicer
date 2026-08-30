@@ -8,7 +8,6 @@ on:
       - ".github/workflows/create-release.yml"
 
 permissions:
-  actions: write
   contents: write
 
 jobs:
@@ -57,10 +56,8 @@ jobs:
 
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "${files[@]}" --clobber
-            gh release edit "$tag" --draft=false --title "PipSpool $version" --notes-file release-notes.md
+            gh release edit "$tag" --draft --title "PipSpool $version" --notes-file release-notes.md
           else
             gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" \
-              --title "PipSpool $version" --notes-file release-notes.md
+              --draft --title "PipSpool $version" --notes-file release-notes.md
           fi
-
-          gh workflow run publish-orcacloud.yml --ref main -f version="$version"
