@@ -57,12 +57,8 @@ jobs:
 
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "${files[@]}" --clobber
-            if [ "$(gh release view "$tag" --json isDraft --jq .isDraft)" = "true" ]; then
-              gh release edit "$tag" --draft --title "PipSpool $version" --notes-file release-notes.md
-            else
-              gh release edit "$tag" --title "PipSpool $version" --notes-file release-notes.md
-            fi
+            gh release edit "$tag" --draft=false --title "PipSpool $version" --notes-file release-notes.md
           else
             gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" \
-              --draft --title "PipSpool $version" --notes-file release-notes.md
+              --title "PipSpool $version" --notes-file release-notes.md
           fi
