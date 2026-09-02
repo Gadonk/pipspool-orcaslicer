@@ -3,6 +3,9 @@ name: Publish to OrcaCloud
 on:
   release:
     types: [published]
+  workflow_run:
+    workflows: ["Create GitHub Release"]
+    types: [completed]
 
 permissions:
   id-token: write
@@ -10,9 +13,9 @@ permissions:
 
 jobs:
   publish:
-    # 2.2.4 is being entered manually in Orca Cloud while the previous update
-    # is still awaiting review. Later releases continue to publish normally.
-    if: github.event.release.tag_name != 'v2.2.4'
+    if: >
+      (github.event_name == 'release' && github.event.release.tag_name != 'v2.2.4') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Check out release
@@ -23,7 +26,13 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          version="${GITHUB_REF_NAME#v}"
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$(for artifact in pipspool_v*.py; do
+              sed -n 's/^# version = "\([0-9][0-9.]*\)"/\1/p' "$artifact"
+            done | sort -V | tail -n 1)"
+          fi
           file_version="${version//./_}"
           files=(pipspool_v"${file_version}"_*.py)
           if [ "${#files[@]}" -ne 5 ]; then
@@ -44,7 +53,13 @@ jobs:
               exit 1
             fi
           done
+          awk -v version="$version" '
+            index($0, "## [" version "] - ") == 1 { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > orcacloud-notes.md
           {
+            echo "PIPSPOOL_VERSION=$version"
             echo 'PLUGIN_FILES<<EOF'
             printf '%s\n' "${files[@]}"
             echo EOF
@@ -56,19 +71,13 @@ jobs:
           set -euo pipefail
           oidc_token="$(curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=orcacloud" | jq -r .value)"
-          version="${GITHUB_REF_NAME#v}"
-          changelog="$(jq -r '.release.body // ""' "$GITHUB_EVENT_PATH" | head -c 4000)"
-          metadata="$(jq -cn --arg version "$version" --arg changelog "$changelog" \
+          changelog="$(head -c 4000 orcacloud-notes.md)"
+          metadata="$(jq -cn --arg version "$PIPSPOOL_VERSION" --arg changelog "$changelog" \
             '{version: $version} + (if $changelog == "" then {} else {changelog: $changelog} end)')"
           args=(--form-string "metadata=$metadata")
-          shopt -s nullglob
           for file in $PLUGIN_FILES; do
             args+=(-F "files=@$file")
           done
-          if [ "${#args[@]}" -eq 1 ]; then
-            echo "No plugin files matched: $PLUGIN_FILES" >&2
-            exit 1
-          fi
           status="$(curl -sS -o response.json -w '%{http_code}' \
             -H "Authorization: Bearer $oidc_token" \
             "${args[@]}" \
