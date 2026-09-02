@@ -2,6 +2,21 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.5] - 2026-09-02
+
+- Added stable bidirectional synchronization for selected Filament, Cooling and Multimaterial fields.
+- Added native Spoolman field types and units for numbers, temperatures, percentages, booleans and choices.
+- Added safe migration of older PipSpool text fields while preserving existing values.
+- Filled newly selected Spoolman fields from Orca's resolved filament profiles.
+- Persisted PipSpool settings, field selections and synchronization history across plugin updates.
+- Added pending-change detection to Refresh with separate synchronize and restart notices.
+- Prevented repeated profile updates, false restart notices and synchronization loops.
+- Improved portable material inheritance so generated profiles remain visible across printers.
+- Added optional Gate/Toolhead and Profile status columns, remaining-weight gauges and direct Spoolman links.
+- Simplified synchronization totals to count each changed spool once with clear field-level details.
+- Added stable packages for Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon.
+- Confirmed all 94 synchronization, dashboard, configuration, packaging and architecture tests pass.
+
 ## [2.2.4] - 2026-08-30
 
 - Added a compact **Columns** menu to the Active spools table.

@@ -23,6 +23,10 @@ filament usage.
 - Automatic `SET_SPOOL_ID ID=42` or optional per-spool custom Start G-code.
 - Optional Orca-master synchronization for selected Filament, Cooling and
   Multimaterial fields.
+- Bidirectional advanced-field updates: one-sided Spoolman changes can update
+  Orca, while Orca remains master if both sides changed differently.
+- Native Spoolman field types and units for temperatures, percentages, numbers,
+  booleans and supported choices.
 - No slicer-side filament deduction and no duplicate process profiles.
 
 ## PipSpool dashboard
@@ -35,12 +39,16 @@ one place:
   bed temperature.
 - A compact **Columns** menu with saved visibility choices for Filament,
   Manufacturer, Colour, Nozzle, Bed and Remaining.
+- Optional Gate/Toolhead and Profile status columns, plus direct spool-number
+  links that open the corresponding Spoolman record.
 - Optional searchable Spoolman Location column, hidden by default.
 - Sticky table headings that remain visible while scrolling through active
   spools.
 - Colour-aware **Printer Gates/Toolheads** overview using assignments already
   reported by Spoolman.
 - **Feedback**, **Refresh** and **Synchronize now** actions.
+- A clear pending-synchronization notice when Refresh detects a Spoolman edit,
+  kept separate from the restart-required notice.
 - Last synchronization metrics, report and visible errors.
 - A detailed change list showing which spool profiles and fields were updated.
 - Optional page visibility without disabling PipSpool's core synchronization.
@@ -92,9 +100,11 @@ Generated profiles use this order:
 (#spool) MATERIAL Filament name - Manufacturer - PipSpool
 ```
 
-PipSpool preserves unrelated Orca-specific profile adjustments. When advanced
-field synchronization is enabled, OrcaSlicer is the master for the selected
-Filament, Cooling and Multimaterial values.
+PipSpool preserves unrelated Orca-specific profile adjustments. Advanced-field
+synchronization remembers the last agreed value so it can identify which side
+changed. A one-sided Spoolman edit is imported into Orca; a one-sided Orca edit
+is exported to Spoolman. If both sides changed differently, Orca remains the
+master.
 
 ## Features I’m working on
 
@@ -114,7 +124,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.4 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.5 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is confirmed on OrcaSlicer 2.5.0 nightly build
 `db29f570` on Windows x86-64 with Spoolman, Klipper, Moonraker and Happy Hare.
 
