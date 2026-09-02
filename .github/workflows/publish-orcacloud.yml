@@ -10,6 +10,8 @@ permissions:
 
 jobs:
   publish:
+    # 2.2.4 was entered manually in Orca Cloud while a previous update was
+    # awaiting review. Later releases continue to publish normally.
     if: github.event.release.tag_name != 'v2.2.4'
     runs-on: ubuntu-latest
     steps:
@@ -21,13 +23,7 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
-            version="${GITHUB_REF_NAME#v}"
-          else
-            version="$(for artifact in pipspool_v*.py; do
-              sed -n 's/^# version = "\([0-9][0-9.]*\)"/\1/p' "$artifact"
-            done | sort -V | tail -n 1)"
-          fi
+          version="${GITHUB_REF_NAME#v}"
           file_version="${version//./_}"
           files=(pipspool_v"${file_version}"_*.py)
           if [ "${#files[@]}" -ne 5 ]; then
@@ -48,11 +44,6 @@ jobs:
               exit 1
             fi
           done
-          awk -v version="$version" '
-            index($0, "## [" version "] - ") == 1 { found=1; next }
-            found && /^## \[/ { exit }
-            found { print }
-          ' CHANGELOG.md > orcacloud-notes.md
           {
             echo "PIPSPOOL_VERSION=$version"
             echo 'PLUGIN_FILES<<EOF'
@@ -66,7 +57,7 @@ jobs:
           set -euo pipefail
           oidc_token="$(curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=orcacloud" | jq -r .value)"
-          changelog="$(jq -r '.release.body // ""' "$GITHUB_EVENT_PATH" | head -c 4000)
+          changelog="$(jq -r '.release.body // ""' "$GITHUB_EVENT_PATH" | head -c 4000)"
           metadata="$(jq -cn --arg version "$PIPSPOOL_VERSION" --arg changelog "$changelog" \
             '{version: $version} + (if $changelog == "" then {} else {changelog: $changelog} end)')"
           args=(--form-string "metadata=$metadata")
