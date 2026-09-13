@@ -54,7 +54,8 @@ one place:
 - Optional page visibility without disabling PipSpool's core synchronization.
 - Remaining-weight gauges, configurable low-filament warnings, duplicate-gate
   warnings and per-spool profile health on gate/toolhead tiles.
-- Grouped selection of advanced Filament, Cooling and Multimaterial fields.
+- Orca-style tabs for advanced Filament, Cooling, Multimaterial, Setting
+  Overrides, Advanced, Dependencies and Notes fields.
 - Deliberate cleanup controls for obsolete PipSpool fields.
 
 Advanced field synchronization is opt-in. No advanced fields are selected by
@@ -124,9 +125,9 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.5 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.6 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is confirmed on OrcaSlicer 2.5.0 nightly build
-`db29f570` on Windows x86-64 with Spoolman, Klipper, Moonraker and Happy Hare.
+`4deadc9d` on Windows x86-64 with Spoolman, Klipper, Moonraker and Happy Hare.
 
 OrcaSlicer's Python plugin API is new and may change in future builds.
 

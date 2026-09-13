@@ -2,6 +2,17 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.6] - 2026-09-13
+
+- Redesigned Advanced field synchronization with Orca-style tabs instead of expanding lists.
+- Added Setting Overrides, Advanced, Dependencies and Notes alongside Filament, Cooling and Multimaterial.
+- Added synchronization support and matching Spoolman units for retraction, Z-hop, wiping and ironing settings.
+- Added explicit synchronization for filament start, change and end G-code plus filament notes.
+- Added opt-in synchronization for compatible printers, compatible print profiles and their conditions.
+- Kept Orca dependency restrictions untouched unless the corresponding dependency field is explicitly selected.
+- Added stable packages for Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon.
+- Validated all five packages for Python syntax, stable metadata and public-safe defaults.
+
 ## [2.2.5] - 2026-09-02
 
 - Added stable bidirectional synchronization for selected Filament, Cooling and Multimaterial fields.
