@@ -1,5 +1,7 @@
 name: Create GitHub Release
 
+# A normal GitHub push or manual dispatch prepares the stable release draft.
+
 on:
   workflow_dispatch:
   push:
