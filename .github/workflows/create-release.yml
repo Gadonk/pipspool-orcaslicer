@@ -69,3 +69,24 @@ jobs:
               --draft --title "PipSpool $version" --notes-file release-notes.md
           fi
 
+      - name: Remove superseded root artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          version="$(for artifact in pipspool_v*.py; do
+            sed -n 's/^# version = "\([0-9][0-9.]*\)"/\1/p' "$artifact"
+          done | sort -V | tail -n 1)"
+          file_version="${version//./_}"
+          stale=()
+          for artifact in pipspool_v*.py; do
+            [[ "$artifact" == pipspool_v"${file_version}"_*.py ]] || stale+=("$artifact")
+          done
+          if [ "${#stale[@]}" -eq 0 ]; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -- "${stale[@]}"
+          git commit -m "Remove superseded PipSpool release files [skip ci]"
+          git push
