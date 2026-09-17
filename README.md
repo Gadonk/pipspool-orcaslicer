@@ -20,7 +20,7 @@ filament usage.
 - Automatic removal of the matching profile when a spool is archived.
 - Sortable names such as `(#42) PLA Galaxy Blue - Manufacturer - PipSpool`.
 - Nozzle and bed temperatures imported from the correct Spoolman material.
-- Automatic `SET_SPOOL_ID ID=42` or optional per-spool custom Start G-code.
+- Managed `SET_SPOOL_ID ID=42` or optional per-spool custom Start G-code, with\n  a visible dashboard toggle for printers and firmware that do not support the command.
 - Optional Orca-master synchronization for selected Filament, Cooling and
   Multimaterial fields.
 - Bidirectional advanced-field updates: one-sided Spoolman changes can update
@@ -46,7 +46,7 @@ one place:
   spools.
 - Colour-aware **Printer Gates/Toolheads** overview using assignments already
   reported by Spoolman.
-- **Feedback**, **Refresh** and **Synchronize now** actions.
+- **Feedback**, **Refresh** and **Synchronize now** actions.\n- A prominent **Spool ID G-code** toggle that is enabled by default and removes\n  only PipSpool-managed `SET_SPOOL_ID` commands when switched off.
 - A clear pending-synchronization notice when Refresh detects a Spoolman edit,
   kept separate from the restart-required notice.
 - Last synchronization metrics, report and visible errors.
@@ -125,7 +125,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.6 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.7 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is confirmed on OrcaSlicer 2.5.0 nightly build
 `4deadc9d` on Windows x86-64 with Spoolman, Klipper, Moonraker and Happy Hare.
 
@@ -136,7 +136,7 @@ OrcaSlicer's Python plugin API is new and may change in future builds.
 PipSpool connects only to the Spoolman address saved in its settings. The public
 source defaults to `http://localhost:7912`; configure your actual server address
 during setup. GitHub Actions rejects private development addresses from release
-artifacts.
+artifacts. Every platform package is also checked for valid Python syntax and\ncomplete embedded artwork before release.
 
 ## License
 
