@@ -60,7 +60,7 @@ one place:
 
 Advanced field synchronization is opt-in. No advanced fields are selected by
 default, and ordinary spool details, temperatures and spool-ID G-code continue
-to work without enabling it.
+to work without enabling it. List-valued dependency settings such as Compatible\nPrinters and Compatible Prints retain their full values in both directions.
 
 ## Install and connect
 
