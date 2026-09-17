@@ -2,6 +2,17 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.7] - 2026-09-17
+
+- Added a prominent **Spool ID G-code** toggle to the Printer Gates/Toolheads card.
+- Kept managed `SET_SPOOL_ID` generation enabled by default for existing users.
+- Allowed `SET_SPOOL_ID` to be disabled for printers and firmware that do not support the command while preserving unrelated filament start G-code.
+- Fixed HTTP 400 errors when synchronizing list-valued dependency fields such as Compatible Printers and Compatible Prints.
+- Preserved dependency lists through their complete Spoolman-to-Orca round trip.
+- Removed PipSpool's external Python networking dependency and retained the public localhost default.
+- Added mandatory Python syntax and embedded-image validation for every generated platform package.
+- Validated stable packages for Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon.
+
 ## [2.2.6] - 2026-09-13
 
 - Redesigned Advanced field synchronization with Orca-style tabs instead of expanding lists.

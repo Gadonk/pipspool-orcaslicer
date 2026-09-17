@@ -33,7 +33,7 @@ jobs:
           expected_metadata="# version = \"${version}\""
           for file in "${files[@]}"; do
             grep -Fqx "$expected_metadata" "$file"
-            grep -Fqx '# dependencies = ["requests"]' "$file"
+            grep -Fqx '# dependencies = []' "$file"
             grep -Fqx 'DEFAULT_SPOOLMAN_URL = "http://localhost:7912"' "$file"
             if grep -Eq 'https?://(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.)' "$file"; then
               echo "Private-network Spoolman address found in $file." >&2
