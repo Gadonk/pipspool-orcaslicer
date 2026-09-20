@@ -2,6 +2,16 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.8] - 2026-09-20
+
+- Fixed a critical regression that could hide every PipSpool filament profile in OrcaSlicer after synchronizing Compatible Printers.
+- Repaired malformed quoted-empty compatibility lists created by 2.2.7.
+- Prevented inherited printer and print compatibility restrictions from being copied into every filament.
+- Added automatic recovery: synchronize once and restart OrcaSlicer to restore affected profiles.
+- Preserved valid explicitly selected dependency values and bidirectional advanced-field synchronization.
+- Validated the recovery through repeated synchronization and OrcaSlicer restart.
+- Added stable packages for Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon.
+
 ## [2.2.7] - 2026-09-17
 
 - Added a prominent **Spool ID G-code** toggle to the Printer Gates/Toolheads card.
