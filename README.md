@@ -20,7 +20,8 @@ filament usage.
 - Automatic removal of the matching profile when a spool is archived.
 - Sortable names such as `(#42) PLA Galaxy Blue - Manufacturer - PipSpool`.
 - Nozzle and bed temperatures imported from the correct Spoolman material.
-- Managed `SET_SPOOL_ID ID=42` or optional per-spool custom Start G-code, with\n  a visible dashboard toggle for printers and firmware that do not support the command.
+- Managed `SET_SPOOL_ID ID=42` or optional per-spool custom Start G-code, with
+  a visible dashboard toggle for printers and firmware that do not support the command.
 - Optional Orca-master synchronization for selected Filament, Cooling and
   Multimaterial fields.
 - Bidirectional advanced-field updates: one-sided Spoolman changes can update
@@ -46,7 +47,9 @@ one place:
   spools.
 - Colour-aware **Printer Gates/Toolheads** overview using assignments already
   reported by Spoolman.
-- **Feedback**, **Refresh** and **Synchronize now** actions.\n- A prominent **Spool ID G-code** toggle that is enabled by default and removes\n  only PipSpool-managed `SET_SPOOL_ID` commands when switched off.
+- **Feedback**, **Refresh** and **Synchronize now** actions.
+- A prominent **Spool ID G-code** toggle that is enabled by default and removes
+  only PipSpool-managed `SET_SPOOL_ID` commands when switched off.
 - A clear pending-synchronization notice when Refresh detects a Spoolman edit,
   kept separate from the restart-required notice.
 - Last synchronization metrics, report and visible errors.
@@ -60,7 +63,8 @@ one place:
 
 Advanced field synchronization is opt-in. No advanced fields are selected by
 default, and ordinary spool details, temperatures and spool-ID G-code continue
-to work without enabling it. List-valued dependency settings such as Compatible\nPrinters and Compatible Prints retain their full values in both directions.
+to work without enabling it. List-valued dependency settings such as Compatible
+Printers and Compatible Prints retain their full values in both directions.
 
 ## Install and connect
 
@@ -136,7 +140,8 @@ OrcaSlicer's Python plugin API is new and may change in future builds.
 PipSpool connects only to the Spoolman address saved in its settings. The public
 source defaults to `http://localhost:7912`; configure your actual server address
 during setup. GitHub Actions rejects private development addresses from release
-artifacts. Every platform package is also checked for valid Python syntax and\ncomplete embedded artwork before release.
+artifacts. Every platform package is also checked for valid Python syntax and
+complete embedded artwork before release.
 
 ## License
 
