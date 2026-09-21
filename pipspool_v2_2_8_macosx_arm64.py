@@ -1954,31 +1954,38 @@ def profile_sync_statuses(
     sync_state: dict[str, dict[str, str]] | None = None,
     inject_spool_id: bool = True,
 ) -> dict[int, dict[str, str]]:
-    """Compare active spools with disk without claiming Orca's live UI state."""
-    directories = profiles.user_filament_directories()
-    if not directories:
+    """Compare active Spoolman spools with Orca's actually loaded user presets."""
+
+    # Use the user presets that Orca has actually loaded. This avoids
+    # treating profiles from user\default and user\<UUID> as simultaneously active.
+    active_files_by_id: dict[int, list[Path]] = {}
+
+    try:
+        collection = orca.host.preset_bundle().filaments
+        for index in range(collection.size()):
+            preset = collection.preset(index)
+            if not preset.is_user() or not preset.file:
+                continue
+            source = Path(preset.file)
+            if not source.name.endswith((PROFILE_SUFFIX, " - Spoolman.json")):
+                continue
+            spool_id = spool_id_from_name(source.name)
+            if spool_id is not None:
+                active_files_by_id.setdefault(spool_id, []).append(source)
+
+    except Exception as exc:
+        log(f"[PROFILE STATUS] Could not inspect Orca loaded presets: {exc!r}")
         return {
             int(spool["id"]): {
                 "status": "error",
                 "warning": (
-                    "PipSpool could not find an Orca user filament directory. "
+                    "PipSpool could not inspect Orca's loaded filament presets. "
                     "Check the PipSpool log for details."
                 ),
             }
-            for spool in spools if spool.get("id") is not None
+            for spool in spools
+            if spool.get("id") is not None
         }
-
-    indexed: list[dict[int, list[Path]]] = []
-    for directory in directories:
-        files_by_id: dict[int, list[Path]] = {}
-        if directory.is_dir():
-            for path in directory.glob("*.json"):
-                spool_id = spool_id_from_name(path.name)
-                if spool_id is not None and path.name.endswith(
-                    (PROFILE_SUFFIX, " - Spoolman.json")
-                ):
-                    files_by_id.setdefault(spool_id, []).append(path)
-        indexed.append(files_by_id)
 
     result: dict[int, dict[str, str]] = {}
     sync_state = sync_state if isinstance(sync_state, dict) else {}
@@ -1989,12 +1996,27 @@ def profile_sync_statuses(
         missing = False
         update_required = False
         comparison_error = False
-        for directory, files_by_id in zip(directories, indexed):
-            candidates = sorted(files_by_id.get(spool_id, []))
-            if not candidates:
-                missing = True
-                continue
-            source = candidates[0]
+        spool_id = int(spool["id"])
+        candidates = sorted(active_files_by_id.get(spool_id, []))
+
+        if not candidates:
+            result[spool_id] = {
+                "status": "profile_missing",
+                "warning": (
+                    f"The active Orca profile for spool #{spool_id} is missing. "
+                    "Select Synchronize now, then restart OrcaSlicer."
+                ),
+            }
+            continue
+
+        update_required = False
+        comparison_error = False
+
+        if len(candidates) > 1:
+            update_required = True
+
+        for source in candidates:
+            directory = source.parent
             try:
                 raw = json.loads(source.read_text(encoding="utf-8"))
                 if not isinstance(raw, dict):
@@ -2003,8 +2025,25 @@ def profile_sync_statuses(
                     spool, raw, profiles, selected_settings, inject_spool_id
                 )
                 target = directory / f"{safe_filename(display_name)}.json"
-                if source != target or len(candidates) > 1 or raw != desired:
+
+                raw_for_compare = dict(raw)
+                desired_for_compare = dict(desired)
+                if "filament_cost" in raw_for_compare and "filament_cost" in desired_for_compare:
+                    try:
+                        raw_for_compare["filament_cost"] = [
+                            f"{float(value):.2f}"
+                            for value in raw_for_compare["filament_cost"]
+                        ]
+                        desired_for_compare["filament_cost"] = [
+                            f"{float(value):.2f}"
+                            for value in desired_for_compare["filament_cost"]
+                        ]
+                    except (TypeError, ValueError):
+                        pass
+
+                if source != target or raw_for_compare != desired_for_compare:
                     update_required = True
+
                 filament = spool.get("filament") or {}
                 baseline = sync_state.get(str(filament.get("id")), {})
                 extras = filament.get("extra") or {}
@@ -2027,8 +2066,6 @@ def profile_sync_statuses(
                     ):
                         update_required = True
                         break
-            except (OSError, ValueError, TypeError):
-                comparison_error = True
 
         if comparison_error:
             result[spool_id] = {
