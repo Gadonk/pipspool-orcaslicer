@@ -961,6 +961,80 @@ class OrcaProfiles:
 
     def parent_for(self, vendor: str, material: str) -> str:
         material_key = material.strip().casefold()
+        material_text = material.strip()
+        vendor_key = vendor.strip()
+
+        # Prefer Orca's live preset bundle. Recent Orca builds store
+        # system presets in .opc files rather than individual JSON files.
+        try:
+            collection = orca.host.preset_bundle().filaments
+            names = {
+                str(name).strip().casefold(): str(name)
+                for name in collection.preset_names()
+            }
+
+            # Build the same material-type index used by the JSON fallback,
+            # but from Orca's live system presets. Orca's host API serializes
+            # filament_type as a semicolon-separated string.
+            live_presets_by_type: dict[str, list[str]] = {}
+            live_type_names: dict[str, str] = {}
+            for name in collection.preset_names():
+                preset = collection.find_preset(name)
+                if preset is None or not preset.is_system:
+                    continue
+                types_serialized = preset.config_value("filament_type")
+                if not isinstance(types_serialized, str):
+                    continue
+                for value in types_serialized.split(";"):
+                    type_name = value.strip()
+                    type_key = type_name.casefold()
+                    if type_key:
+                        live_presets_by_type.setdefault(type_key, []).append(str(name))
+                        live_type_names.setdefault(type_key, type_name)
+
+            # First choice: vendor-specific exact system preset.
+            if vendor_key:
+                vendor_parent = f"{vendor_key} {material_text} @System"
+                found = names.get(vendor_parent.casefold())
+                if found:
+                    return found
+
+            # Second choice: generic exact system preset.
+            generic_parent = f"Generic {material_text} @System"
+            found = names.get(generic_parent.casefold())
+            if found:
+                return found
+
+            # Preserve the existing compatible-material logic: choose the
+            # longest material type that is a complete prefix of the material.
+            compatible_types = [
+                type_key for type_key in live_presets_by_type
+                if material_key.startswith(type_key)
+                and len(material_key) > len(type_key)
+                and not material_key[len(type_key)].isalnum()
+            ]
+            if compatible_types:
+                compatible_type = max(compatible_types, key=len)
+                type_name = live_type_names[compatible_type]
+
+                # Third choice: vendor-specific compatible material type.
+                if vendor_key:
+                    vendor_parent = f"{vendor_key} {type_name} @System"
+                    found = names.get(vendor_parent.casefold())
+                    if found:
+                        return found
+
+                # Fourth choice: generic compatible material type.
+                generic_parent = f"Generic {type_name} @System"
+                found = names.get(generic_parent.casefold())
+                if found:
+                    return found
+
+        except Exception as exc:
+            log(f"[ORCA PARENT PRESET] {exc}")
+
+        # Fallback for older Orca builds where system presets are
+        # available as JSON files.
         presets_by_type: dict[str, list[str]] = {}
         for name, preset in self.system_presets.items():
             types = preset.get("filament_type") or []
