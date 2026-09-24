@@ -2,6 +2,21 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.9] - 2026-09-24
+
+- Added live Orca system-preset discovery for vendor `.opc` caches while preserving the JSON fallback for older Orca installations, based on the approach contributed by JP-Reitsma in PR #7.
+- Improved parent selection for exact vendors, portable generic presets and custom material families.
+- Synchronized shared Spoolman Filament settings across every associated physical-spool profile, based on JP-Reitsma's issue #9.
+- Propagated a single Orca-side sibling edit to the other profiles while preserving and clearly reporting conflicting simultaneous edits.
+- Added dashboard filters with live counts for all, loaded, low-filament, synchronization-needed and profile-problem spools.
+- Added ascending and descending sorting by spool number, material, remaining weight, manufacturer and gate/toolhead.
+- Made synchronization warnings diagnostic by naming affected spools and the specific missing, renamed, duplicate or changed profile data.
+- Fixed persistent synchronization warnings after successful synchronization, Orca restarts and shared-Filament conflicts.
+- Excluded Orca-only profile inheritance from Spoolman change detection while retaining manual parent repair.
+- Removed the unnecessary vertical scrollbar from Advanced field tabs and retained horizontal access on narrow windows.
+- Preserved the 2.2.8 compatibility-list recovery and validated 104 synchronization, dashboard, configuration, packaging and architecture tests.
+- Added stable packages for Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon.
+
 ## [2.2.8] - 2026-09-20
 
 - Fixed a critical regression that could hide every PipSpool filament profile in OrcaSlicer after synchronizing Compatible Printers.

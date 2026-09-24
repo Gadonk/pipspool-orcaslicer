@@ -4,7 +4,7 @@
 # name = "PipSpool"
 # description = "Spoolman synchronization plugin for OrcaSlicer"
 # author = "Donko"
-# version = "2.2.8"
+# version = "2.2.9"
 # ///
 
 """PipSpool: synchronize Spoolman inventory into OrcaSlicer presets.
@@ -64,7 +64,7 @@ finally:
 # Public default. Configure the Spoolman server address in PipSpool Settings.
 DEFAULT_SPOOLMAN_URL = "http://localhost:7912"
 DEFAULT_LOW_STOCK_THRESHOLD_GRAMS = 100.0
-PLUGIN_VERSION = "2.2.8"
+PLUGIN_VERSION = "2.2.9"
 COPYRIGHT_YEAR = 2026
 FEEDBACK_URL = "https://github.com/Gadonk/pipspool-orcaslicer/issues"
 LATEST_RELEASE_API = "https://api.github.com/repos/Gadonk/pipspool-orcaslicer/releases/latest"
@@ -157,6 +157,12 @@ END_MARKER = "; PipSpool: end managed spool ID"
 LEGACY_START_MARKER = "; Spoolman Bridge: begin managed spool ID"
 LEGACY_END_MARKER = "; Spoolman Bridge: end managed spool ID"
 ORCA_FIELD_PREFIX = "orca_"
+LIVE_SYSTEM_FILAMENT_PRESETS: dict[str, list[str]] = {}
+# Orca's inheritance choice is local preset structure, not data represented by
+# Spoolman's Filament, Spool or extra-field API. Startup status checks also lack
+# the UI-thread system-preset snapshot used by a real synchronization, so a
+# different fallback parent must not be presented as a Spoolman sync change.
+PROFILE_STATUS_ORCA_ONLY_KEYS = frozenset({"inherits"})
 # These belong to OrcaSlicer's Dependencies tab. PipSpool never infers them;
 # they are synchronized only when the user explicitly selects those fields.
 ORCA_DEPENDENCY_KEYS = (
@@ -912,6 +918,12 @@ class OrcaProfiles:
         self.user_root = root / "user"
         self.system_root = root / "system"
         self.system_presets = self._system_preset_index()
+        # This is a plain-data copy captured on Orca's host thread. Never keep
+        # live preset handles for use by PipSpool's background workers.
+        self.live_system_presets = {
+            str(name): list(material_types)
+            for name, material_types in LIVE_SYSTEM_FILAMENT_PRESETS.items()
+        }
 
     def _system_preset_index(self) -> dict[str, dict[str, Any]]:
         result: dict[str, dict[str, Any]] = {}
@@ -961,6 +973,16 @@ class OrcaProfiles:
 
     def parent_for(self, vendor: str, material: str) -> str:
         material_key = material.strip().casefold()
+
+        # Recent Orca builds keep system filament presets in vendor .opc
+        # caches. Prefer the host-supplied snapshot when it contains a suitable
+        # portable parent, then retain the JSON index as an older-build fallback.
+        live_parent = self._parent_from_index(
+            vendor, material, self.live_system_presets
+        )
+        if live_parent is not None:
+            return live_parent
+
         presets_by_type: dict[str, list[str]] = {}
         for name, preset in self.system_presets.items():
             types = preset.get("filament_type") or []
@@ -995,6 +1017,53 @@ class OrcaProfiles:
         # with "Generic PETG" (or another material). Orca hides children of that
         # parent whenever a different printer is active.
         return f"Generic {parent_type.upper()} @System"
+
+    @staticmethod
+    def _parent_from_index(
+        vendor: str,
+        material: str,
+        presets: dict[str, list[str]],
+    ) -> str | None:
+        """Select a portable live system parent without retaining host handles."""
+        if not presets:
+            return None
+        material_text = material.strip()
+        material_key = material_text.casefold()
+        vendor_text = vendor.strip()
+        names = {str(name).strip().casefold(): str(name) for name in presets}
+
+        def named_parent(prefix: str, type_name: str) -> str | None:
+            candidate = f"{prefix} {type_name} @System".strip()
+            return names.get(candidate.casefold())
+
+        if vendor_text:
+            found = named_parent(vendor_text, material_text)
+            if found:
+                return found
+        found = named_parent("Generic", material_text)
+        if found:
+            return found
+
+        type_names: dict[str, str] = {}
+        for values in presets.values():
+            for value in values:
+                type_name = str(value).strip()
+                if type_name:
+                    type_names.setdefault(type_name.casefold(), type_name)
+        compatible = [
+            type_key for type_key in type_names
+            if material_key.startswith(type_key)
+            and len(material_key) > len(type_key)
+            and not material_key[len(type_key)].isalnum()
+        ]
+        if not compatible:
+            return None
+        type_name = type_names[max(compatible, key=len)]
+        if vendor_text:
+            found = named_parent(vendor_text, type_name)
+            if found:
+                return found
+        return named_parent("Generic", type_name)
 
     def effective_preset(self, preset: dict[str, Any]) -> dict[str, Any]:
         chain = []
@@ -1299,12 +1368,16 @@ def desired_preset(
     # Only apply advanced values after synchronize_filament_settings has
     # reconciled both sides. Raw Spoolman data must never win by accident.
     if filament.get("_pipspool_advanced_values_reconciled") is True:
+        conflicted = set(filament.get("_pipspool_advanced_conflicts") or ())
+        reconciled_settings = tuple(
+            setting for setting in selected_settings if setting not in conflicted
+        )
         # Selected dependencies are jointly managed. Remove an old local value
         # first so an empty Spoolman value clears a bad Orca restriction.
         for key in ORCA_DEPENDENCY_KEYS:
-            if key in selected_settings:
+            if key in reconciled_settings:
                 preset.pop(key, None)
-        preset.update(decoded_orca_overrides(filament, selected_settings))
+        preset.update(decoded_orca_overrides(filament, reconciled_settings))
 
     # Preserve restrictions unless the user explicitly selected that dependency
     # field for synchronization. Unselected compatibility remains Orca-owned.
@@ -1316,8 +1389,10 @@ def desired_preset(
 def host_filament_preset_snapshot(
     selected_settings=ORCA_SETTINGS,
 ) -> dict[str, dict[str, Any]]:
-    """Copy Orca's resolved preset values while the host handle is safe to read."""
+    """Copy Orca preset values and system-parent metadata on the host thread."""
+    global LIVE_SYSTEM_FILAMENT_PRESETS
     snapshot: dict[str, dict[str, Any]] = {}
+    system_presets: dict[str, list[str]] = {}
     try:
         collection = orca.host.preset_bundle().filaments
         for name in collection.preset_names():
@@ -1325,6 +1400,21 @@ def host_filament_preset_snapshot(
             if preset is None:
                 continue
             keys = set(preset.config_keys())
+            system_flag = getattr(preset, "is_system", False)
+            if callable(system_flag):
+                system_flag = system_flag()
+            if system_flag and "filament_type" in keys:
+                material_types = preset.config_value("filament_type")
+                if isinstance(material_types, str):
+                    material_types = material_types.split(";")
+                elif not isinstance(material_types, (list, tuple)):
+                    material_types = []
+                cleaned_types = [
+                    str(value).strip() for value in material_types
+                    if str(value).strip()
+                ]
+                if cleaned_types:
+                    system_presets[str(name)] = cleaned_types
             values = {}
             for setting in selected_settings:
                 if setting not in keys:
@@ -1334,6 +1424,7 @@ def host_filament_preset_snapshot(
                     values[setting] = value
             if values:
                 snapshot[str(name)] = values
+        LIVE_SYSTEM_FILAMENT_PRESETS = system_presets
     except Exception as exc:
         log(f"[ORCA PRESET SNAPSHOT] {exc}")
     return snapshot
@@ -1348,6 +1439,7 @@ def synchronize_filament_settings(
     live_preset_values: dict[str, dict[str, Any]] | None = None,
     sync_state: dict[str, dict[str, str]] | None = None,
     change_directions: dict[str, set[int]] | None = None,
+    conflict_messages: list[str] | None = None,
 ) -> int:
     """Reconcile advanced fields using the last successful value as baseline."""
     sync_state = sync_state if isinstance(sync_state, dict) else {}
@@ -1360,37 +1452,41 @@ def synchronize_filament_settings(
         if filament.get("id") is not None:
             grouped.setdefault(int(filament["id"]), []).append(spool)
 
+    live_preset_values = live_preset_values or {}
     updated = 0
     for filament_id, filament_spools in grouped.items():
-        example = filament_spools[0]
-        filament = example.get("filament") or {}
+        filament = (filament_spools[0].get("filament") or {})
         vendor = str((filament.get("vendor") or {}).get("name") or "Generic").strip()
         material = filament_material(filament)
-        local_master = profiles.preset_for_spool(int(example["id"]))
-        master = local_master
-        if not master:
-            parent = profiles.parent_for(vendor, material)
-            master = profiles.system_presets.get(parent, {"inherits": parent})
-            local_master = {}
-        master = profiles.effective_preset(master)
-        live_preset_values = live_preset_values or {}
-        # The host snapshot contains Orca's resolved values, while JSON files
-        # commonly contain only local overrides. Apply parent first and the
-        # spool's own preset last so Orca remains authoritative.
-        live_names = (
-            profiles.parent_for(vendor, material),
-            str(master.get("inherits") or ""),
-            str(master.get("name") or ""),
-        )
-        for preset_name in live_names:
-            if preset_name in live_preset_values:
-                master.update({
-                    key: value
-                    for key, value in live_preset_values[preset_name].items()
-                    if key not in ORCA_DEPENDENCY_KEYS
-                })
+        resolved_profiles: list[tuple[int, dict[str, Any], dict[str, Any]]] = []
+        for spool in filament_spools:
+            spool_id = int(spool["id"])
+            local = profiles.preset_for_spool(spool_id)
+            effective = local
+            if not effective:
+                parent = profiles.parent_for(vendor, material)
+                effective = profiles.system_presets.get(
+                    parent, {"inherits": parent}
+                )
+                local = {}
+            effective = profiles.effective_preset(effective)
+            live_names = (
+                profiles.parent_for(vendor, material),
+                str(effective.get("inherits") or ""),
+                str(effective.get("name") or ""),
+            )
+            for preset_name in live_names:
+                if preset_name in live_preset_values:
+                    effective.update({
+                        key: value
+                        for key, value in live_preset_values[preset_name].items()
+                        if key not in ORCA_DEPENDENCY_KEYS
+                    })
+            resolved_profiles.append((spool_id, local, effective))
+
         extras = dict(filament.get("extra") or {})
         patch_values: dict[str, str] = {}
+        conflicted_settings: set[str] = set()
         filament_state = sync_state.setdefault(str(filament_id), {})
         for stale_setting in set(filament_state) - set(selected_settings):
             filament_state.pop(stale_setting, None)
@@ -1398,43 +1494,79 @@ def synchronize_filament_settings(
             key = orca_extra_key(setting)
             current = decode_extra_value(extras.get(key))
             current_encoded = encode_spoolman_setting_value(setting, current)
-            # A value inherited from a system parent is not a local Orca
-            # choice. Do not promote that restriction onto every filament.
-            if setting in ORCA_DEPENDENCY_KEYS and setting not in local_master:
+            candidates: dict[int, str] = {}
+            for spool_id, local, effective in resolved_profiles:
+                if setting in ORCA_DEPENDENCY_KEYS and setting not in local:
+                    continue
+                if setting not in effective:
+                    continue
+                encoded = encode_spoolman_setting_value(
+                    setting, effective[setting]
+                )
+                if encoded is not None:
+                    candidates[spool_id] = encoded
+            if not candidates:
                 if current_encoded is not None:
                     filament_state[setting] = current_encoded
                 continue
-            if setting not in master:
-                continue
-            encoded = encode_spoolman_setting_value(setting, master[setting])
-            if encoded is None:
-                continue
+
             baseline = filament_state.get(setting)
-            if reset or baseline is None:
-                agreed = encoded
-            elif current_encoded == encoded:
-                agreed = encoded
-            elif encoded == baseline and current_encoded is not None:
-                # Orca stayed at the last synchronized value, so Spoolman was
-                # edited and becomes the new agreed value for this field.
+            unique_values = set(candidates.values())
+            changed_values: dict[str, set[int]] = {}
+            if baseline is not None:
+                for spool_id, value in candidates.items():
+                    if value != baseline:
+                        changed_values.setdefault(value, set()).add(spool_id)
+
+            if (baseline is None and len(unique_values) > 1) or (
+                baseline is not None and len(changed_values) > 1
+            ):
+                conflicted_settings.add(setting)
+                involved = ", ".join(
+                    f"#{spool_id}" for spool_id in sorted(candidates)
+                )
+                message = (
+                    f"Shared Filament #{filament_id}: conflicting Orca edits "
+                    f"for {setting.replace('_', ' ')} across spool profiles "
+                    f"{involved}. No value was synchronized for this field."
+                )
+                if conflict_messages is not None and message not in conflict_messages:
+                    conflict_messages.append(message)
+                log(f"[FILAMENT SETTING CONFLICT] {message}")
+                continue
+
+            all_spool_ids = {int(spool["id"]) for spool in filament_spools}
+            if baseline is None:
+                agreed = next(iter(unique_values))
+                source_ids = {
+                    spool_id for spool_id, value in candidates.items()
+                    if value == agreed
+                }
+                if current_encoded != agreed and change_directions is not None:
+                    change_directions["orca_to_spoolman"].update(source_ids)
+            elif changed_values:
+                agreed, source_ids = next(iter(changed_values.items()))
+                if change_directions is not None:
+                    change_directions["orca_to_spoolman"].update(source_ids)
+                    change_directions["spoolman_to_orca"].update(
+                        all_spool_ids - source_ids
+                    )
+            elif reset:
+                agreed = next(iter(unique_values))
+                if current_encoded != agreed and change_directions is not None:
+                    change_directions["orca_to_spoolman"].update(all_spool_ids)
+            elif current_encoded is not None and current_encoded != baseline:
                 agreed = current_encoded
                 if change_directions is not None:
-                    change_directions["spoolman_to_orca"].update(
-                        int(spool["id"]) for spool in filament_spools
-                    )
+                    change_directions["spoolman_to_orca"].update(all_spool_ids)
             else:
-                # Orca changed, or both sides changed differently. Orca wins a
-                # genuine conflict because it is the declared master.
-                agreed = encoded
+                agreed = baseline
+
             if current_encoded != agreed or (
                 setting in ORCA_LIST_TEXT_SETTINGS
                 and malformed_empty_orca_text_list(extras.get(key))
             ):
                 patch_values[key] = agreed
-                if change_directions is not None:
-                    change_directions["orca_to_spoolman"].update(
-                        int(spool["id"]) for spool in filament_spools
-                    )
             extras[key] = agreed
             filament_state[setting] = agreed
         if not filament_state:
@@ -1446,6 +1578,9 @@ def synchronize_filament_settings(
             spool_filament = spool.get("filament") or {}
             spool_filament["extra"] = dict(extras)
             spool_filament["_pipspool_advanced_values_reconciled"] = True
+            spool_filament["_pipspool_advanced_conflicts"] = sorted(
+                conflicted_settings
+            )
     return updated
 
 
@@ -1509,6 +1644,15 @@ def changed_profile_fields(existing: dict[str, Any], desired: dict[str, Any]) ->
             described.update(matching)
     labels.extend(key.replace("_", " ") for key in sorted(changed - described))
     return ", ".join(labels) if labels else "profile data"
+
+
+def comparable_profile_for_status(profile: dict[str, Any]) -> dict[str, Any]:
+    """Exclude Orca-only structure from the Spoolman synchronization status."""
+    return {
+        key: value
+        for key, value in profile.items()
+        if key not in PROFILE_STATUS_ORCA_ONLY_KEYS
+    }
 
 
 def sync_profiles(
@@ -1771,12 +1915,14 @@ def sync_with_spoolman(
     spools = client.active_spools()
     profiles = orca_profiles()
     change_directions: dict[str, set[int]] = {}
+    setting_conflicts: list[str] = []
     try:
         synchronize_filament_settings(
             spools, profiles, client, selected_settings=selected_settings,
             live_preset_values=live_preset_values,
             sync_state=sync_state,
             change_directions=change_directions,
+            conflict_messages=setting_conflicts,
         )
     except Exception as exc:
         warning = f"Filament setting sync: {exc}"
@@ -1789,6 +1935,8 @@ def sync_with_spoolman(
     )
     if field_warning:
         report.errors.insert(0, field_warning)
+    if setting_conflicts:
+        report.errors[0:0] = setting_conflicts
     report_data = {
         "active_spools": report.active_spools,
         "created": report.created,
@@ -1906,14 +2054,18 @@ class ResetFilamentSettingsCapability(orca.script.ScriptPluginCapabilityBase):
                 client.ensure_orca_filament_fields(selected_settings)
                 spools = client.active_spools()
                 profiles = orca_profiles()
+                setting_conflicts: list[str] = []
                 updated = synchronize_filament_settings(
                     spools, profiles, client, reset=True,
                     selected_settings=selected_settings,
                     live_preset_values=live_preset_values,
                     sync_state=sync_state,
+                    conflict_messages=setting_conflicts,
                 )
                 save_settings({"advanced_sync_state": sync_state})
                 report = sync_profiles(spools, profiles, selected_settings)
+                if setting_conflicts:
+                    report.errors[0:0] = setting_conflicts
                 show_message(
                     f"Reset {updated} Spoolman filament record(s) from Orca.\n\n"
                     + report.summary()
@@ -1980,8 +2132,43 @@ def profile_sync_statuses(
                     files_by_id.setdefault(spool_id, []).append(path)
         indexed.append(files_by_id)
 
-    result: dict[int, dict[str, str]] = {}
     sync_state = sync_state if isinstance(sync_state, dict) else {}
+    conflict_settings: dict[int, set[str]] = {}
+    grouped: dict[int, list[dict[str, Any]]] = {}
+    for spool in spools:
+        filament = spool.get("filament") or {}
+        if filament.get("id") is not None:
+            grouped.setdefault(int(filament["id"]), []).append(spool)
+    for filament_id, filament_spools in grouped.items():
+        baseline = sync_state.get(str(filament_id), {})
+        for setting in selected_settings:
+            candidates: dict[int, str] = {}
+            for sibling in filament_spools:
+                sibling_id = int(sibling["id"])
+                local = profiles.preset_for_spool(sibling_id)
+                if not local:
+                    continue
+                effective = profiles.effective_preset(local)
+                if setting in ORCA_DEPENDENCY_KEYS and setting not in local:
+                    continue
+                if setting not in effective:
+                    continue
+                encoded = encode_spoolman_setting_value(
+                    setting, effective.get(setting)
+                )
+                if encoded is not None:
+                    candidates[sibling_id] = encoded
+            if not candidates:
+                continue
+            agreed = baseline.get(setting)
+            unique_values = set(candidates.values())
+            changed_values = {
+                value for value in unique_values if agreed is not None and value != agreed
+            }
+            if (agreed is None and len(unique_values) > 1) or len(changed_values) > 1:
+                conflict_settings.setdefault(filament_id, set()).add(setting)
+
+    result: dict[int, dict[str, str]] = {}
     for spool in spools:
         if spool.get("id") is None:
             continue
@@ -1989,6 +2176,7 @@ def profile_sync_statuses(
         missing = False
         update_required = False
         comparison_error = False
+        update_reasons: set[str] = set()
         for directory, files_by_id in zip(directories, indexed):
             candidates = sorted(files_by_id.get(spool_id, []))
             if not candidates:
@@ -1999,14 +2187,45 @@ def profile_sync_statuses(
                 raw = json.loads(source.read_text(encoding="utf-8"))
                 if not isinstance(raw, dict):
                     raise ValueError("profile root is not an object")
+                filament = spool.get("filament") or {}
+                filament_id = int(filament.get("id")) if filament.get("id") is not None else -1
+                baseline = sync_state.get(str(filament_id), {})
+                conflicts = conflict_settings.get(filament_id, set())
+                comparison_spool = spool
+                if any(setting in baseline for setting in selected_settings):
+                    # A fresh Spoolman fetch does not contain PipSpool's
+                    # in-memory reconciliation marker. Restore it from the
+                    # persisted baseline before building the desired preset;
+                    # otherwise every selected advanced value already written
+                    # to Orca is mistaken for a pending removal after restart.
+                    comparison_spool = dict(spool)
+                    comparison_filament = dict(filament)
+                    comparison_filament[
+                        "_pipspool_advanced_values_reconciled"
+                    ] = True
+                    comparison_filament["_pipspool_advanced_conflicts"] = sorted(
+                        conflicts
+                    )
+                    comparison_spool["filament"] = comparison_filament
                 display_name, desired = desired_preset(
-                    spool, raw, profiles, selected_settings, inject_spool_id
+                    comparison_spool, raw, profiles, selected_settings,
+                    inject_spool_id,
                 )
                 target = directory / f"{safe_filename(display_name)}.json"
-                if source != target or len(candidates) > 1 or raw != desired:
+                if source != target:
                     update_required = True
-                filament = spool.get("filament") or {}
-                baseline = sync_state.get(str(filament.get("id")), {})
+                    update_reasons.add("the profile name or filename changed")
+                if len(candidates) > 1:
+                    update_required = True
+                    update_reasons.add("duplicate profile files were found")
+                comparable_raw = comparable_profile_for_status(raw)
+                comparable_desired = comparable_profile_for_status(desired)
+                if comparable_raw != comparable_desired:
+                    update_required = True
+                    update_reasons.add(
+                        "profile fields differ "
+                        f"({changed_profile_fields(comparable_raw, comparable_desired)})"
+                    )
                 extras = filament.get("extra") or {}
                 effective = profiles.effective_preset(raw)
                 for setting in selected_settings:
@@ -2026,6 +2245,9 @@ def profile_sync_statuses(
                         and spoolman_value != agreed
                     ):
                         update_required = True
+                        update_reasons.add(
+                            f"Spoolman changed {setting.replace('_', ' ')}"
+                        )
                         break
             except (OSError, ValueError, TypeError):
                 comparison_error = True
@@ -2042,17 +2264,38 @@ def profile_sync_statuses(
         elif missing:
             result[spool_id] = {
                 "status": "profile_missing",
+                "reason": f"Spool #{spool_id}: Orca profile is missing",
                 "warning": (
                     f"The Orca profile for spool #{spool_id} is missing. Select "
                     "Synchronize now, then restart OrcaSlicer."
                 ),
             }
         elif update_required:
+            reason_text = "; ".join(sorted(update_reasons)) or "profile data differs"
             result[spool_id] = {
                 "status": "update_required",
+                "reason": f"Spool #{spool_id}: {reason_text}",
                 "warning": (
-                    f"The Orca profile for spool #{spool_id} needs synchronization. "
+                    f"The Orca profile for spool #{spool_id} needs synchronization: "
+                    f"{reason_text}. "
                     "Select Synchronize now, then restart OrcaSlicer."
+                ),
+            }
+        elif conflict_settings.get(
+            int((spool.get("filament") or {}).get("id") or -1)
+        ):
+            conflicts = conflict_settings[
+                int((spool.get("filament") or {}).get("id") or -1)
+            ]
+            fields = ", ".join(
+                setting.replace("_", " ") for setting in sorted(conflicts)
+            )
+            result[spool_id] = {
+                "status": "conflict",
+                "warning": (
+                    f"Orca profiles sharing this Spoolman Filament contain "
+                    f"different values for {fields}. PipSpool preserved them; "
+                    "make the sibling profiles agree before synchronizing."
                 ),
             }
         else:
@@ -2233,6 +2476,11 @@ def pipspool_page_state(notice=None, friendly_initial_error=False) -> dict[str, 
         if (gate := page_gate_data(spool, statuses.get(int(spool.get("id") or -1))))
     ]
     gates.sort(key=lambda item: (item["printer"].casefold(), item["gate"]))
+    synchronization_reasons = [
+        str(value.get("reason") or value.get("warning") or "").strip()
+        for _, value in sorted(statuses.items())
+        if value.get("status") in {"profile_missing", "update_required"}
+    ]
     return {
         "type": "state",
         "connected": connected,
@@ -2247,6 +2495,7 @@ def pipspool_page_state(notice=None, friendly_initial_error=False) -> dict[str, 
             value.get("status") in {"profile_missing", "update_required"}
             for value in statuses.values()
         ),
+        "synchronization_reasons": synchronization_reasons,
         "available_update": available_update(settings),
         "last_report": settings.get("last_sync_report"),
         "spools": [
@@ -2293,6 +2542,17 @@ def pipspool_page_html(initial_state=None) -> str:
     initial_synchronization_required = (
         initial_state.get("synchronization_required") is True
     )
+    initial_sync_reasons = [
+        str(reason) for reason in initial_state.get("synchronization_reasons", [])
+        if str(reason).strip()
+    ]
+    initial_sync_text = "Changes detected — select Synchronize now to reconcile Orca and Spoolman."
+    if initial_sync_reasons:
+        shown_reasons = initial_sync_reasons[:3]
+        remaining_reasons = len(initial_sync_reasons) - len(shown_reasons)
+        initial_sync_text = "Synchronization needed — " + " | ".join(shown_reasons)
+        if remaining_reasons:
+            initial_sync_text += f" | and {remaining_reasons} more"
     initial_available_update = initial_state.get("available_update")
     if isinstance(initial_report, dict):
         initial_active = initial_report.get("active_spools", len(initial_spools))
@@ -2347,6 +2607,7 @@ def pipspool_page_html(initial_state=None) -> str:
             "synced": "Synced",
             "profile_missing": "Profile missing",
             "update_required": "Update required",
+            "conflict": "Conflict",
             "error": "Error",
         }.get(sync_status, "Unknown")
         sync_warning = escape(str(spool.get("sync_warning") or ""), quote=True)
@@ -2474,32 +2735,32 @@ body.pipspool-page button:hover{{background:#0d4788;border-color:#42a9ff}}body.p
 .connection-layout{{display:grid;grid-template-columns:minmax(270px,330px) minmax(0,1fr);gap:20px;align-items:start}}.connection-side{{min-width:0}}.gate-panel{{position:relative;min-width:0;padding-left:20px;border-left:1px solid var(--orca-border)}}.gate-panel h2{{margin-bottom:2px;color:var(--ivory)}}.gate-panel>p{{padding-right:235px}}
 .spool-id-control{{position:absolute;top:-4px;right:0;display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid #2385cf;border-radius:9px;background:#061a35;color:var(--ivory);cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2)}}.spool-id-control-copy{{display:flex;flex-direction:column;line-height:1.15}}.spool-id-control-copy b{{font-size:12px}}.spool-id-control-copy span{{margin-top:3px;color:var(--orca-muted);font-size:10px}}.switch{{position:relative;width:40px;height:22px;flex:0 0 auto}}.switch input{{position:absolute;opacity:0;pointer-events:none}}.switch-track{{position:absolute;inset:0;border:1px solid #57738d;border-radius:12px;background:#24384b;transition:.18s}}.switch-track:after{{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#d8e3eb;transition:.18s}}.switch input:checked+.switch-track{{border-color:#36a7ff;background:#1177c5;box-shadow:0 0 10px rgba(54,167,255,.28)}}.switch input:checked+.switch-track:after{{transform:translateX(18px);background:white}}.spool-id-control:focus-within{{outline:2px solid var(--cyan);outline-offset:2px}}
 body.pipspool-page input:focus{{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(66,229,234,.16)}}.metrics{{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}}.metric{{background:#061a35;border:1px solid #1766a5;border-radius:8px;padding:10px}}.metric b{{display:block;font-size:19px;color:var(--cyan)}}.metric span,.muted{{color:var(--orca-muted);font-size:12px}}
-.report{{white-space:pre-wrap;background:#041326;border:1px solid #0d4f85;border-radius:8px;padding:11px;min-height:76px;color:#d7e7f4}}.toolbar{{display:flex;align-items:flex-start;gap:9px;margin-bottom:10px}}.toolbar input[type=search]{{flex:1}}.columns-menu{{position:relative;border:0;padding:0;flex:0 0 auto}}.columns-menu summary{{list-style:none;border:1px solid #277fc5;border-radius:7px;background:#0a315f;color:var(--ivory);padding:8px 13px;font-weight:600}}.columns-menu summary::-webkit-details-marker{{display:none}}.columns-menu[open] summary{{background:#0d4788}}.column-choices{{position:absolute;z-index:5;right:0;top:42px;width:210px;padding:10px;border:1px solid #2385cf;border-radius:9px;background:#061a35;box-shadow:0 10px 26px rgba(0,0,0,.45)}}.column-choices label{{display:flex;align-items:center;gap:8px;padding:5px 3px}}
-.spool-link{{padding:2px 5px!important;border:0!important;background:transparent!important;color:#8fd0ff!important;font:inherit!important;white-space:nowrap}}.spool-link:hover{{color:var(--cyan)!important;text-decoration:underline}}.table-gauge{{position:relative;display:inline-flex;min-width:88px;min-height:25px;align-items:center;justify-content:center;overflow:hidden;border:1px solid #2789c7;border-radius:9px;background:#06213d}}.table-gauge-fill{{position:absolute;inset:0 auto 0 0}}.table-gauge-copy{{position:relative;z-index:1;font-size:12px;font-weight:650;color:#f4f5f6}}.profile-status{{display:inline-block;padding:3px 7px;border-radius:8px;background:#092746;color:#b9d5ea;white-space:nowrap}}.profile-synced{{color:#9dd8bd}}.profile-profile_missing,.profile-update_required,.profile-error{{border:1px solid #d65e58;background:#3a1c20;color:#ffd1cc}}
+.report{{white-space:pre-wrap;background:#041326;border:1px solid #0d4f85;border-radius:8px;padding:11px;min-height:76px;color:#d7e7f4}}.toolbar{{display:flex;align-items:flex-start;gap:9px;margin-bottom:10px}}.toolbar input[type=search]{{flex:1}}.columns-menu{{position:relative;border:0;padding:0;flex:0 0 auto}}.columns-menu summary{{list-style:none;border:1px solid #277fc5;border-radius:7px;background:#0a315f;color:var(--ivory);padding:8px 13px;font-weight:600}}.columns-menu summary::-webkit-details-marker{{display:none}}.columns-menu[open] summary{{background:#0d4788}}.column-choices{{position:absolute;z-index:5;right:0;top:42px;width:210px;padding:10px;border:1px solid #2385cf;border-radius:9px;background:#061a35;box-shadow:0 10px 26px rgba(0,0,0,.45)}}.column-choices label{{display:flex;align-items:center;gap:8px;padding:5px 3px}}.spool-controls{{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 11px}}.spool-filters{{display:flex;flex-wrap:wrap;gap:6px}}body.pipspool-page .spool-filter{{padding:5px 9px;border-color:#1d639a;background:#071f3b;color:#a9bfd4;font-size:11px}}body.pipspool-page .spool-filter.active{{border-color:var(--cyan);background:#0a4568;color:#e8ffff;box-shadow:0 0 9px rgba(66,229,234,.16)}}.filter-count{{display:inline-flex;min-width:18px;height:18px;margin-left:5px;padding:0 5px;align-items:center;justify-content:center;border-radius:9px;background:#041326;color:#9dcbed;font-size:10px}}.sort-controls{{display:flex;align-items:center;gap:6px;flex:0 0 auto}}.sort-controls label{{color:var(--orca-muted);font-size:11px}}body.pipspool-page select{{height:31px;border:1px solid #277fc5;border-radius:7px;background:#061a35;color:var(--ivory);padding:4px 28px 4px 8px;outline:none}}body.pipspool-page .sort-direction{{min-width:34px;height:31px;padding:4px 8px;font-size:15px}}
+.spool-link{{padding:2px 5px!important;border:0!important;background:transparent!important;color:#8fd0ff!important;font:inherit!important;white-space:nowrap}}.spool-link:hover{{color:var(--cyan)!important;text-decoration:underline}}.table-gauge{{position:relative;display:inline-flex;min-width:88px;min-height:25px;align-items:center;justify-content:center;overflow:hidden;border:1px solid #2789c7;border-radius:9px;background:#06213d}}.table-gauge-fill{{position:absolute;inset:0 auto 0 0}}.table-gauge-copy{{position:relative;z-index:1;font-size:12px;font-weight:650;color:#f4f5f6}}.profile-status{{display:inline-block;padding:3px 7px;border-radius:8px;background:#092746;color:#b9d5ea;white-space:nowrap}}.profile-synced{{color:#9dd8bd}}.profile-profile_missing,.profile-update_required,.profile-conflict,.profile-error{{border:1px solid #d65e58;background:#3a1c20;color:#ffd1cc}}
 table{{width:100%;border-collapse:separate;border-spacing:0}}th,td{{padding:9px 8px;border-bottom:1px solid #175486;text-align:left}}th{{color:var(--orca-muted);font-size:12px}}.spool-wrap thead th{{position:sticky;top:0;z-index:2;background:#08264b;box-shadow:0 1px 0 #2385cf}}.swatch{{display:inline-block;width:14px;height:14px;border:1px solid #77a5c8;border-radius:50%;vertical-align:-2px;margin-right:7px}}
 .gate-grid{{display:grid;grid-template-columns:repeat(8,minmax(108px,1fr));gap:10px;margin-top:14px}}.gate-tile{{min-width:0;min-height:184px;padding:11px 8px;border:1px solid #2385cf;border-radius:10px;background:linear-gradient(160deg,#0b3970,#061e3f);display:flex;flex-direction:column;align-items:center;text-align:center;box-shadow:0 5px 15px rgba(0,45,95,.28),inset 0 1px rgba(126,204,255,.1)}}.gate-status{{height:21px;color:#8fc8ff;font-size:11px}}.gate-image{{width:72px;height:58px;margin:3px 0 7px;display:block;filter:drop-shadow(0 4px 5px rgba(0,0,0,.32))}}.gate-material{{font-size:14px;line-height:1.2;color:var(--ivory)}}.gate-printer{{max-width:100%;margin-top:3px;color:var(--orca-muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}.gate-alert{{margin-top:5px;color:#ffd37f;font-size:11px;font-weight:750}}.gate-remaining{{margin-top:auto;padding:3px 8px;border:1px solid #32a8eb;border-radius:10px;background:#08345a;color:var(--cyan);font-size:12px;font-weight:650}}.low-stock{{border-color:var(--amber);background:linear-gradient(160deg,#624014,#261b0c);box-shadow:0 0 0 1px rgba(242,164,58,.22),0 7px 18px rgba(90,52,0,.42),inset 0 1px rgba(255,221,158,.13)}}.low-stock .gate-remaining{{border-color:var(--amber);background:#4b300d;color:#ffe0a1}}.empty-gate{{opacity:.58}}.empty-gate .gate-status{{color:#d3d6da;font-size:13px;font-weight:700}}.empty-gate .gate-remaining{{visibility:hidden}}
 .gate-gauge{{position:relative;width:100%;min-height:28px;margin-top:auto;overflow:hidden;border:1px solid #32a8eb;border-radius:10px;background:#041c31;color:#f8fbff;font-size:11px;font-weight:700;box-shadow:inset 0 1px 3px rgba(0,0,0,.4)}}.gate-gauge-fill{{position:absolute;inset:0 auto 0 0;transition:width .2s ease}}.gate-gauge-copy{{position:relative;z-index:1;min-height:26px;padding:2px 5px;display:flex;align-items:center;justify-content:center;gap:4px;line-height:1.05;text-shadow:0 1px 2px #000}}.gate-low-label{{display:block;font-size:9px;color:#fff0dd}}.gate-grams{{white-space:nowrap}}
 .gate-problem{{border-color:var(--bad);box-shadow:0 0 0 1px rgba(240,113,104,.3),0 7px 18px rgba(92,17,17,.38),inset 0 1px rgba(255,190,185,.12)}}
 .spool-wrap{{max-height:420px;overflow:auto}}.wide{{grid-column:1/-1}}details{{border-top:1px solid var(--orca-border);padding:11px 0}}summary{{cursor:pointer;font-weight:650}}
-.field-tabs{{display:flex;align-items:flex-end;gap:24px;margin:17px 0 0;padding:0 4px;border-bottom:1px solid #1d6fae;overflow-x:auto}}body.pipspool-page .field-tab{{position:relative;flex:0 0 auto;border:0;border-radius:0;background:transparent;color:#8fa9c1;padding:10px 3px 11px;font-size:14px;font-weight:600;box-shadow:none}}body.pipspool-page .field-tab:hover{{border:0;background:transparent;color:var(--ivory)}}body.pipspool-page .field-tab.active{{color:var(--ivory)}}body.pipspool-page .field-tab.active:after{{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;border-radius:3px 3px 0 0;background:var(--cyan);box-shadow:0 0 10px rgba(66,229,234,.35)}}.tab-count{{display:inline-flex;min-width:20px;height:20px;margin-left:6px;padding:0 6px;align-items:center;justify-content:center;border:1px solid #246fa9;border-radius:10px;background:#061a35;color:#a9bfd4;font-size:11px}}.field-tab.active .tab-count{{border-color:#2ca9c2;color:var(--cyan)}}
+.field-tabs{{display:flex;min-width:0;align-items:flex-end;gap:24px;margin:17px 0 0;padding:0 4px;border-bottom:1px solid #1d6fae;overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain}}body.pipspool-page .field-tab{{position:relative;flex:0 0 auto;border:0;border-radius:0;background:transparent;color:#8fa9c1;padding:10px 3px 11px;font-size:14px;font-weight:600;box-shadow:none}}body.pipspool-page .field-tab:hover{{border:0;background:transparent;color:var(--ivory)}}body.pipspool-page .field-tab.active{{color:var(--ivory)}}body.pipspool-page .field-tab.active:after{{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;border-radius:3px 3px 0 0;background:var(--cyan);box-shadow:0 0 10px rgba(66,229,234,.35)}}.tab-count{{display:inline-flex;min-width:20px;height:20px;margin-left:6px;padding:0 6px;align-items:center;justify-content:center;border:1px solid #246fa9;border-radius:10px;background:#061a35;color:#a9bfd4;font-size:11px}}.field-tab.active .tab-count{{border-color:#2ca9c2;color:var(--cyan)}}
 .field-workspace{{min-height:270px;padding:18px 4px 4px}}.field-panel[hidden]{{display:none}}.field-panel-heading{{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:15px;padding-bottom:12px;border-bottom:1px solid #174f80}}.field-panel-heading h3{{margin:0 0 3px;color:var(--ivory);font-size:15px}}.field-panel-heading p{{margin:0}}.group-actions{{display:flex;flex:0 0 auto;gap:7px}}.group-actions button{{padding:5px 10px;font-size:12px}}.choices{{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:7px 18px}}.choice{{display:flex;align-items:center;gap:10px;min-height:34px;padding:5px 8px;border:1px solid transparent;border-radius:6px;color:#dce9f3}}.choice:hover{{border-color:#1767a8;background:#07284d}}.choice input{{flex:0 0 auto}}input[type=checkbox]{{accent-color:var(--orca-accent)}}
 .field-footer{{display:flex;justify-content:space-between;align-items:center;margin-top:12px}}.danger-zone{{border-color:#704b47;background:linear-gradient(145deg,#352a29,#2a2222)}}.danger-zone p{{color:#ddbeb8}}.error{{color:var(--bad)}}
 .page-footer{{margin-top:18px;padding:14px 10px 10px;border-top:1px solid #174f80;color:var(--orca-muted);font-size:11px;text-align:left}}.page-footer b{{color:var(--ivory);font-weight:650}}.footer-separator{{margin:0 7px;color:#3d7daf}}
 .restart-banner{{grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:12px 15px;border:1px solid var(--amber);border-radius:9px;background:#3a280d;color:#ffe4ad;font-weight:650;box-shadow:0 0 16px rgba(242,164,58,.14)}}.restart-banner[hidden]{{display:none}}.restart-symbol{{font-size:18px;color:var(--amber)}}
 .sync-banner{{grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:12px 15px;border:1px solid #42a9ff;border-radius:9px;background:#073354;color:#d8f6ff;font-weight:650;box-shadow:0 0 16px rgba(66,169,255,.12)}}.sync-banner[hidden]{{display:none}}.sync-symbol{{font-size:17px;color:var(--cyan)}}
 .update-banner{{grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:12px 15px;border:1px solid var(--cyan);border-radius:9px;background:#073354;color:#d8f6ff;font-weight:650;box-shadow:0 0 16px rgba(66,229,234,.12)}}.update-banner[hidden]{{display:none}}.update-symbol{{font-size:17px;color:var(--cyan)}}
-@media(max-width:1100px){{.connection-layout{{grid-template-columns:1fr}}.gate-panel{{padding:17px 0 0;border-left:0;border-top:1px solid var(--orca-border)}}.spool-id-control{{top:12px}}.gate-grid{{grid-template-columns:repeat(4,minmax(108px,1fr))}}}}@media(max-width:850px){{.grid{{grid-template-columns:1fr}}.top-actions{{margin-left:0}}header{{flex-wrap:wrap}}.gate-panel>p{{padding-right:0;margin-top:58px}}.spool-id-control{{left:0;right:auto}}.gate-grid{{grid-template-columns:repeat(2,minmax(108px,1fr))}}}}
+@media(max-width:1100px){{.connection-layout{{grid-template-columns:1fr}}.gate-panel{{padding:17px 0 0;border-left:0;border-top:1px solid var(--orca-border)}}.spool-id-control{{top:12px}}.gate-grid{{grid-template-columns:repeat(4,minmax(108px,1fr))}}}}@media(max-width:850px){{.grid{{grid-template-columns:1fr}}.top-actions{{margin-left:0}}header{{flex-wrap:wrap}}.gate-panel>p{{padding-right:0;margin-top:58px}}.spool-id-control{{left:0;right:auto}}.gate-grid{{grid-template-columns:repeat(2,minmax(108px,1fr))}}.spool-controls{{align-items:flex-start;flex-direction:column}}.sort-controls{{width:100%}}.sort-controls select{{flex:1}}}}
 </style></head><body class="pipspool-page"><main>
 <header><img class="logo" src="{PIPSPOOL_LOGO_DATA_URI}" alt="PipSpool"><div><h1>PipSpool</h1><p class="sub">Spoolman synchronization for OrcaSlicer</p></div><div class="top-actions"><button id="feedback">Feedback</button><button id="refresh">Refresh</button><button id="sync" class="primary">Synchronize now</button></div></header>
-<div class="grid"><div id="updateBanner" class="update-banner"{"" if initial_available_update else " hidden"}><span class="update-symbol">↑</span><span id="updateText">PipSpool {escape(str(initial_available_update or ''))} is available — open File → Plugins to update.</span></div><div id="syncBanner" class="sync-banner"{"" if initial_synchronization_required and not initial_restart_required else " hidden"}><span class="sync-symbol">⇄</span><span>Spoolman changes detected — select Synchronize now to update Orca profiles.</span></div><div id="restartBanner" class="restart-banner"{"" if initial_restart_required else " hidden"}><span class="restart-symbol">↻</span><span>Filament profiles changed — restart OrcaSlicer to load them.</span></div><section class="card wide"><div class="connection-layout"><div class="connection-side"><h2>Connection</h2><div class="status-line"><img id="statusPip" class="status-pip" src="{initial_pip}" alt="Pip connection status"><div class="status-copy"><b id="status">{initial_status}</b><p id="connectionDetail" class="muted">{initial_detail}</p><p class="muted">Server settings, can be found in the PipSpool plugin settings.</p></div></div></div><div id="loadoutCard" class="gate-panel"><h2>Printer Gates/Toolheads</h2><p class="muted">A quick view of the gate assignments reported by Spoolman.</p><label class="spool-id-control" title="Add SET_SPOOL_ID to PipSpool filament profiles"><span class="spool-id-control-copy"><b>Spool ID G-code</b><span id="spoolIdState">{"Enabled" if initial_spool_id_gcode else "Disabled"}</span></span><span class="switch"><input id="spoolIdGcode" type="checkbox"{" checked" if initial_spool_id_gcode else ""}><span class="switch-track"></span></span></label><div id="loadout" class="gate-grid">{loadout_cards_html}</div><p id="loadoutEmpty" class="muted"{" hidden" if loadout_cards_html else ""}>No active spools are assigned to a printer gate in Spoolman.</p></div></div></section>
-<section class="card"><h2>Active spools</h2><div class="toolbar"><input id="search" type="search" placeholder="Search by spool number, material, colour, manufacturer, name, location, gate or profile status"><details class="columns-menu"><summary>Columns</summary><div class="column-choices">{''.join(f'<label><input type="checkbox" data-table-column="{column}"{" checked" if column in initial_table_columns else ""}>{SPOOL_TABLE_COLUMN_LABELS[column]}</label>' for column in SPOOL_TABLE_COLUMNS)}</div></details></div><div class="spool-wrap"><table><thead><tr><th>Spool</th><th>Material</th><th data-column="filament">Filament</th><th data-column="manufacturer">Manufacturer</th><th data-column="colour">Colour</th><th data-column="nozzle">Nozzle</th><th data-column="bed">Bed</th><th data-column="remaining">Remaining</th><th data-column="location">Location</th><th data-column="loaded">Gate/Toolhead</th><th data-column="sync">Profile status</th></tr></thead><tbody id="spools">{spool_rows_html}</tbody></table></div><p id="empty" class="muted"{" hidden" if initial_spools else ""}>No matching active spools.</p></section>
+<div class="grid"><div id="updateBanner" class="update-banner"{"" if initial_available_update else " hidden"}><span class="update-symbol">↑</span><span id="updateText">PipSpool {escape(str(initial_available_update or ''))} is available — open File → Plugins to update.</span></div><div id="syncBanner" class="sync-banner"{"" if initial_synchronization_required and not initial_restart_required else " hidden"}><span class="sync-symbol">⇄</span><span id="syncText">{escape(initial_sync_text)}</span></div><div id="restartBanner" class="restart-banner"{"" if initial_restart_required else " hidden"}><span class="restart-symbol">↻</span><span>Filament profiles changed — restart OrcaSlicer to load them.</span></div><section class="card wide"><div class="connection-layout"><div class="connection-side"><h2>Connection</h2><div class="status-line"><img id="statusPip" class="status-pip" src="{initial_pip}" alt="Pip connection status"><div class="status-copy"><b id="status">{initial_status}</b><p id="connectionDetail" class="muted">{initial_detail}</p><p class="muted">Server settings, can be found in the PipSpool plugin settings.</p></div></div></div><div id="loadoutCard" class="gate-panel"><h2>Printer Gates/Toolheads</h2><p class="muted">A quick view of the gate assignments reported by Spoolman.</p><label class="spool-id-control" title="Add SET_SPOOL_ID to PipSpool filament profiles"><span class="spool-id-control-copy"><b>Spool ID G-code</b><span id="spoolIdState">{"Enabled" if initial_spool_id_gcode else "Disabled"}</span></span><span class="switch"><input id="spoolIdGcode" type="checkbox"{" checked" if initial_spool_id_gcode else ""}><span class="switch-track"></span></span></label><div id="loadout" class="gate-grid">{loadout_cards_html}</div><p id="loadoutEmpty" class="muted"{" hidden" if loadout_cards_html else ""}>No active spools are assigned to a printer gate in Spoolman.</p></div></div></section>
+<section class="card"><h2>Active spools</h2><div class="toolbar"><input id="search" type="search" placeholder="Search by spool number, material, colour, manufacturer, name, location, gate or profile status"><details class="columns-menu"><summary>Columns</summary><div class="column-choices">{''.join(f'<label><input type="checkbox" data-table-column="{column}"{" checked" if column in initial_table_columns else ""}>{SPOOL_TABLE_COLUMN_LABELS[column]}</label>' for column in SPOOL_TABLE_COLUMNS)}</div></details></div><div class="spool-controls"><div class="spool-filters" role="group" aria-label="Filter active spools"><button type="button" class="spool-filter active" data-spool-filter="all" aria-pressed="true">All<span class="filter-count" data-filter-count="all">0</span></button><button type="button" class="spool-filter" data-spool-filter="loaded" aria-pressed="false">Loaded<span class="filter-count" data-filter-count="loaded">0</span></button><button type="button" class="spool-filter" data-spool-filter="low" aria-pressed="false">Low filament<span class="filter-count" data-filter-count="low">0</span></button><button type="button" class="spool-filter" data-spool-filter="sync" aria-pressed="false">Needs synchronization<span class="filter-count" data-filter-count="sync">0</span></button><button type="button" class="spool-filter" data-spool-filter="problems" aria-pressed="false">Profile problems<span class="filter-count" data-filter-count="problems">0</span></button></div><div class="sort-controls"><label for="spoolSort">Sort by</label><select id="spoolSort"><option value="id">Spool number</option><option value="material">Material</option><option value="remaining">Remaining weight</option><option value="vendor">Manufacturer</option><option value="gate">Gate/toolhead</option></select><button id="sortDirection" class="sort-direction" type="button" title="Ascending order" aria-label="Ascending order">↑</button></div></div><div class="spool-wrap"><table><thead><tr><th>Spool</th><th>Material</th><th data-column="filament">Filament</th><th data-column="manufacturer">Manufacturer</th><th data-column="colour">Colour</th><th data-column="nozzle">Nozzle</th><th data-column="bed">Bed</th><th data-column="remaining">Remaining</th><th data-column="location">Location</th><th data-column="loaded">Gate/Toolhead</th><th data-column="sync">Profile status</th></tr></thead><tbody id="spools">{spool_rows_html}</tbody></table></div><p id="empty" class="muted"{" hidden" if initial_spools else ""}>No matching active spools.</p></section>
 <section class="card"><h2>Last synchronization</h2><div class="metrics"><div class="metric"><b id="active">{initial_active}</b><span>Active spools</span></div><div class="metric"><b id="changed">{initial_changed}</b><span>Changed spools</span></div><div class="metric"><b id="errors">{len(initial_errors) if isinstance(initial_report, dict) else '—'}</b><span>Errors</span></div></div><pre id="report" class="report">{escape(initial_report_text)}</pre></section>
-<section class="card wide"><h2>Advanced field synchronization</h2><p class="muted">Choose settings from each Orca filament tab that PipSpool may expose in Spoolman. Ordinary spool details and temperatures are unaffected.</p><nav class="field-tabs" role="tablist" aria-label="Orca filament setting sections">{''.join(field_tabs)}</nav><div class="field-workspace">{''.join(field_panels)}</div><div class="field-footer"><span id="selectionCount" class="muted">{len(selected_fields)} field{"" if len(selected_fields) == 1 else "s"} selected</span><button id="saveFields">Save field selection</button></div></section>
+<section class="card wide"><h2>Advanced field synchronization</h2><p class="muted">Each physical spool has its own Orca profile. Selected Advanced values are stored on the shared Spoolman Filament, so changing one profile can update every profile using that Filament. Inventory belongs to the individual spool; ordinary filament temperatures still come from Spoolman.</p><nav class="field-tabs" role="tablist" aria-label="Orca filament setting sections">{''.join(field_tabs)}</nav><div class="field-workspace">{''.join(field_panels)}</div><div class="field-footer"><span id="selectionCount" class="muted">{len(selected_fields)} field{"" if len(selected_fields) == 1 else "s"} selected</span><button id="saveFields">Save field selection</button></div></section>
 <section class="card wide danger-zone"><h2>Cleanup</h2><p>Remove every unselected <code>orca_*</code> field from Spoolman. This permanently deletes the saved values in those fields for all filaments.</p><button id="cleanup">Remove unselected fields…</button></section></div>
 <footer class="page-footer"><b>PipSpool {escape(PLUGIN_VERSION)}</b><span class="footer-separator">•</span>© {COPYRIGHT_YEAR} Donko<span class="footer-separator">•</span>Spoolman synchronization for OrcaSlicer<br><span>Independent community project; not affiliated with OrcaSlicer or Spoolman.</span></footer>
 <script>
 function byId(id){{return document.getElementById(id);}}
-var state={{spools:[],busy:false,lowStockThreshold:{initial_low_stock_threshold},tableColumns:{json.dumps(initial_table_columns)}}};
+var state={{spools:[],busy:false,lowStockThreshold:{initial_low_stock_threshold},tableColumns:{json.dumps(initial_table_columns)},spoolFilter:'all',spoolSort:'id',sortDirection:1}};
 var bridgeReady=false;
 function send(action,extra){{
   if(bridgeReady&&window.orca){{
@@ -2547,19 +2808,53 @@ function applyTableColumns(){{
   var i;
   for(i=0;i<cells.length;i++)cells[i].style.display=state.tableColumns.indexOf(cells[i].getAttribute('data-column'))===-1?'none':'';
 }}
+function spoolMatchesFilter(spool,filter){{
+  if(filter==='loaded')return spool.loaded===true&&spool.gate!=null;
+  if(filter==='low')return state.lowStockThreshold>0&&spool.remaining!=null&&spool.remaining<=state.lowStockThreshold;
+  if(filter==='sync')return spool.sync_status==='update_required';
+  if(filter==='problems')return spool.sync_status==='profile_missing'||spool.sync_status==='conflict'||spool.sync_status==='error';
+  return true;
+}}
+function updateFilterCounts(){{
+  var filters=['all','loaded','low','sync','problems'];
+  var i,j,count,badge;
+  for(i=0;i<filters.length;i++){{
+    count=0;
+    for(j=0;j<state.spools.length;j++)if(spoolMatchesFilter(state.spools[j],filters[i]))count++;
+    badge=document.querySelector('[data-filter-count="'+filters[i]+'"]');
+    if(badge)badge.textContent=count;
+  }}
+}}
+function spoolSortValue(spool,key){{
+  if(key==='remaining')return spool.remaining==null?-1:Number(spool.remaining);
+  if(key==='gate')return spool.loaded&&spool.gate!=null?(String(spool.printer||'').toLowerCase()+' '+('00000000'+String(spool.gate)).slice(-8)):'\uffff';
+  if(key==='id')return Number(spool.id)||0;
+  return String(spool[key]||'').toLowerCase();
+}}
+function compareSpools(left,right){{
+  var a=spoolSortValue(left,state.spoolSort),b=spoolSortValue(right,state.spoolSort),result=0;
+  if(typeof a==='number'&&typeof b==='number')result=a-b;
+  else if(a<b)result=-1;
+  else if(a>b)result=1;
+  if(result===0)result=(Number(left.id)||0)-(Number(right.id)||0);
+  return result*state.sortDirection;
+}}
 function renderSpools(){{
   var q=byId('search').value.toLowerCase().replace(/^\s+|\s+$/g,'');
   var body=byId('spools');
   var count=0;
+  var spools=state.spools.slice().sort(compareSpools);
   var i,j;
   while(body.firstChild)body.removeChild(body.firstChild);
-  for(i=0;i<state.spools.length;i++){{
-    var spool=state.spools[i];
+  updateFilterCounts();
+  for(i=0;i<spools.length;i++){{
+    var spool=spools[i];
+    if(!spoolMatchesFilter(spool,state.spoolFilter))continue;
     if(JSON.stringify(spool).toLowerCase().indexOf(q)===-1)continue;
     count++;
     var row=document.createElement('tr');
     var loaded=spool.loaded&&spool.gate!=null?(spool.printer||'Printer')+' · Gate '+spool.gate:'—';
-    var statusLabels={{synced:'Synced',profile_missing:'Profile missing',update_required:'Update required',error:'Error'}};
+    var statusLabels={{synced:'Synced',profile_missing:'Profile missing',update_required:'Update required',conflict:'Conflict',error:'Error'}};
     var columns=['','', 'filament','manufacturer','colour','nozzle','bed','remaining','location','loaded','sync'];
     var values=['#'+spool.id,spool.material,spool.name,spool.vendor,'',spool.nozzle_temperature==null?'—':spool.nozzle_temperature+' °C',spool.bed_temperature==null?'—':spool.bed_temperature+' °C','',spool.location||'—',loaded,statusLabels[spool.sync_status]||'Unknown'];
     for(j=0;j<values.length;j++){{
@@ -2630,6 +2925,14 @@ function renderLoadout(gates){{
   }}
   byId('loadoutEmpty').style.display=gates.length?'none':'block';
 }}
+function synchronizationBannerText(reasons){{
+  reasons=reasons||[];
+  if(!reasons.length)return 'Changes detected — select Synchronize now to reconcile Orca and Spoolman.';
+  var shown=reasons.slice(0,3);
+  var message='Synchronization needed — '+shown.join(' | ');
+  if(reasons.length>shown.length)message+=' | and '+(reasons.length-shown.length)+' more';
+  return message;
+}}
 function applyState(data){{
   data=data||{{}};
   state.spools=data.spools||[];
@@ -2648,6 +2951,7 @@ function applyState(data){{
   byId('connectionDetail').className='muted';
   byId('restartBanner').style.display=data.restart_required===true?'flex':'none';
   byId('syncBanner').style.display=data.synchronization_required===true&&data.restart_required!==true?'flex':'none';
+  byId('syncText').textContent=synchronizationBannerText(data.synchronization_reasons);
   var availableUpdate=data.available_update||'';
   byId('updateBanner').style.display=availableUpdate?'flex':'none';
   byId('updateText').textContent=availableUpdate?('PipSpool '+availableUpdate+' is available — open File → Plugins to update.'):'';
@@ -2707,6 +3011,27 @@ byId('spoolIdGcode').onchange=function(){{
 byId('saveFields').onclick=function(){{setBusy(true);send('save-fields',{{selected_fields:selectedFields()}});}};
 byId('cleanup').onclick=function(){{if(window.confirm('Permanently delete every unselected PipSpool field and its values from all Spoolman filaments?')){{setBusy(true);send('cleanup',{{selected_fields:selectedFields()}});}}}};
 byId('search').oninput=renderSpools;
+var spoolFilterButtons=document.querySelectorAll('[data-spool-filter]');
+var spoolFilterIndex;
+for(spoolFilterIndex=0;spoolFilterIndex<spoolFilterButtons.length;spoolFilterIndex++)spoolFilterButtons[spoolFilterIndex].onclick=function(){{
+  state.spoolFilter=this.getAttribute('data-spool-filter')||'all';
+  var i;
+  for(i=0;i<spoolFilterButtons.length;i++){{
+    var active=spoolFilterButtons[i]===this;
+    spoolFilterButtons[i].classList.toggle('active',active);
+    spoolFilterButtons[i].setAttribute('aria-pressed',active?'true':'false');
+  }}
+  renderSpools();
+}};
+byId('spoolSort').onchange=function(){{state.spoolSort=this.value||'id';renderSpools();}};
+byId('sortDirection').onclick=function(){{
+  state.sortDirection*=-1;
+  var ascending=state.sortDirection===1;
+  this.textContent=ascending?'↑':'↓';
+  this.title=ascending?'Ascending order':'Descending order';
+  this.setAttribute('aria-label',this.title);
+  renderSpools();
+}};
 byId('spools').onclick=function(event){{
   var target=event.target;
   if(target&&target.getAttribute&&target.getAttribute('data-open-spool'))send('open-spool',{{spool_id:target.getAttribute('data-open-spool')}});

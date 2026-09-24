@@ -22,10 +22,11 @@ filament usage.
 - Nozzle and bed temperatures imported from the correct Spoolman material.
 - Managed `SET_SPOOL_ID ID=42` or optional per-spool custom Start G-code, with
   a visible dashboard toggle for printers and firmware that do not support the command.
-- Optional Orca-master synchronization for selected Filament, Cooling and
-  Multimaterial fields.
+- Optional synchronization for selected fields across every Orca filament tab.
 - Bidirectional advanced-field updates: one-sided Spoolman changes can update
   Orca, while Orca remains master if both sides changed differently.
+- Shared Spoolman Filament values propagate across all associated physical-spool
+  profiles without silently overwriting conflicting sibling edits.
 - Native Spoolman field types and units for temperatures, percentages, numbers,
   booleans and supported choices.
 - No slicer-side filament deduction and no duplicate process profiles.
@@ -43,6 +44,10 @@ one place:
 - Optional Gate/Toolhead and Profile status columns, plus direct spool-number
   links that open the corresponding Spoolman record.
 - Optional searchable Spoolman Location column, hidden by default.
+- Live-count filters for all, loaded, low-filament, synchronization-needed and
+  profile-problem spools.
+- Ascending or descending sorting by spool number, material, remaining weight,
+  manufacturer and gate/toolhead.
 - Sticky table headings that remain visible while scrolling through active
   spools.
 - Colour-aware **Printer Gates/Toolheads** overview using assignments already
@@ -50,8 +55,8 @@ one place:
 - **Feedback**, **Refresh** and **Synchronize now** actions.
 - A prominent **Spool ID G-code** toggle that is enabled by default and removes
   only PipSpool-managed `SET_SPOOL_ID` commands when switched off.
-- A clear pending-synchronization notice when Refresh detects a Spoolman edit,
-  kept separate from the restart-required notice.
+- A diagnostic pending-synchronization notice that identifies affected spools
+  and changed fields, kept separate from the restart-required notice.
 - Last synchronization metrics, report and visible errors.
 - A detailed change list showing which spool profiles and fields were updated.
 - Optional page visibility without disabling PipSpool's core synchronization.
@@ -129,7 +134,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.8 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.9 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is confirmed on OrcaSlicer 2.5.0 nightly build
 `4deadc9d` on Windows x86-64 with Spoolman, Klipper, Moonraker and Happy Hare.
 
