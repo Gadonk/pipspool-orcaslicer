@@ -2,6 +2,15 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.10-dev_1] - 2026-09-30
+
+- Added optional OrcaSlicer lifecycle-event integration for saved presets, active filament/printer context, project changes, device changes and completed jobs.
+- Debounced lifecycle refreshes and kept normalized Orca/Spoolman comparison as the sole authority for synchronization warnings, preventing events from creating false-positive banners.
+- Limited automatic preset-save detection to filament presets and included the saved preset name when a real synchronization difference is found.
+- Preserved compatibility with OrcaSlicer builds that do not expose the lifecycle API; manual refresh and existing synchronization checks continue to work unchanged.
+- Restored current PipSpool settings from the Python backend whenever Orca recreates the settings WebKit page, rather than trusting stale embedded HTML values.
+- Added lifecycle mode information to settings and diagnostics for easier compatibility testing.
+
 ## [2.2.9] - 2026-09-24
 
 - Added live Orca system-preset discovery for vendor `.opc` caches while preserving the JSON fallback for older Orca installations, based on the approach contributed by JP-Reitsma in PR #7.

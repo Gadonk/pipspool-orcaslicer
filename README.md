@@ -138,6 +138,12 @@ PipSpool 2.2.9 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is confirmed on OrcaSlicer 2.5.0 nightly build
 `4deadc9d` on Windows x86-64 with Spoolman, Klipper, Moonraker and Happy Hare.
 
+The upcoming 2.2.10 release uses OrcaSlicer's lifecycle-event API when it is
+available to notice saved filament presets and other relevant host changes.
+Older OrcaSlicer builds remain supported through PipSpool's existing manual
+refresh and normalized comparison fallback; the new Orca API is not a minimum
+requirement.
+
 OrcaSlicer's Python plugin API is new and may change in future builds.
 
 ## Privacy and release safety
