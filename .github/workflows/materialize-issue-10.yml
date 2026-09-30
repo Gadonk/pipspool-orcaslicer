@@ -33,10 +33,23 @@ jobs:
           done
           rm pipspool.py
           python3 -m py_compile pipspool_v2_2_10_dev_1_*.py
-          python3 -c 'from pathlib import Path; files=sorted(Path(".").glob("pipspool_v2_2_10_dev_1_*.py")); assert len(files)==5; data=[p.read_bytes() for p in files]; assert len(set(data))==1; text=data[0].decode(); assert "# version = \\"2.2.10-dev_1\\"" in text; assert "PLUGIN_VERSION = \\"2.2.10-dev_1\\"" in text; assert "DEFAULT_SPOOLMAN_URL = \\"http://localhost:7912\\"" in text'
-          if grep -R -E 'https?://(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.)' --include='pipspool_v2_2_10_dev_1_*.py' .; then
-            exit 1
-          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          files = sorted(Path(".").glob("pipspool_v2_2_10_dev_1_*.py"))
+          assert len(files) == 5
+          payloads = [path.read_bytes() for path in files]
+          assert len(set(payloads)) == 1
+          text = payloads[0].decode()
+          assert '# version = "2.2.10-dev_1"' in text
+          assert 'PLUGIN_VERSION = "2.2.10-dev_1"' in text
+          assert 'DEFAULT_SPOOLMAN_URL = "http://localhost:7912"' in text
+          assert not re.search(
+              r"https?://(?:10\\.|192\\.168\\.|172\\.(?:1[6-9]|2[0-9]|3[01])\\.)",
+              text,
+          )
+          PY
           git diff --check
           find __pycache__ -type f -delete
           rmdir __pycache__
