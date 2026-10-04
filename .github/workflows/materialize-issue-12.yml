@@ -1,0 +1,65 @@
+name: Materialize PipSpool issue 12 development build
+
+on:
+  push:
+    branches:
+      - feature/issue-10-lifecycle-events
+    paths:
+      - .github/workflows/materialize-issue-12.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.event.head_commit.message == 'Materialize issue 12 development build'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/issue-10-lifecycle-events
+
+      - name: Build and validate development packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .github/issue12-source.patch.b64 > /tmp/pipspool-issue12-source.patch
+          base64 -d .github/issue12-docs.patch.b64 > /tmp/pipspool-issue12-docs.patch
+          cp pipspool_v2_2_10_dev_1_win_x86_64.py pipspool.py
+          git apply /tmp/pipspool-issue12-source.patch
+          git apply /tmp/pipspool-issue12-docs.patch
+          for platform in linux_arm64 linux_x86_64 macosx_arm64 macosx_x86_64 win_x86_64; do
+            cp pipspool.py "pipspool_v2_2_10_dev_2_${platform}.py"
+          done
+          rm pipspool.py
+          git rm pipspool_v2_2_10_dev_1_*.py
+          python3 -m py_compile pipspool_v2_2_10_dev_2_*.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          files = sorted(Path(".").glob("pipspool_v2_2_10_dev_2_*.py"))
+          assert len(files) == 5
+          payloads = [path.read_bytes() for path in files]
+          assert len(set(payloads)) == 1
+          text = payloads[0].decode()
+          assert '# version = "2.2.10-dev_2"' in text
+          assert 'PLUGIN_VERSION = "2.2.10-dev_2"' in text
+          assert 'ACTIVE_SPOOL_GCODE = "SET_ACTIVE_SPOOL"' in text
+          assert 'f"{ACTIVE_SPOOL_GCODE} ID={int(spool_id)}"' in text
+          assert 'DEFAULT_SPOOLMAN_URL = "http://localhost:7912"' in text
+          assert not re.search(
+              r"https?://(?:10\\.|192\\.168\\.|172\\.(?:1[6-9]|2[0-9]|3[01])\\.)",
+              text,
+          )
+          PY
+          git diff --check
+          find __pycache__ -type f -delete
+          rmdir __pycache__
+          git config user.name "Donko"
+          git config user.email "75442485+Gadonk@users.noreply.github.com"
+          git rm .github/issue12-source.patch.b64 .github/issue12-docs.patch.b64 .github/workflows/materialize-issue-12.yml
+          git add CHANGELOG.md README.md pipspool_v2_2_10_dev_2_*.py
+          git commit -m "Use Moonraker active-spool macro"
+          git push origin HEAD:feature/issue-10-lifecycle-events
