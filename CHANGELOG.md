@@ -2,8 +2,11 @@
 
 All notable PipSpool changes are documented here.
 
-## [2.2.10-dev_1] - 2026-09-30
+## [2.2.10-dev_2] - 2026-10-04
 
+- Replaced the non-standard managed `SET_SPOOL_ID` start command with Moonraker's documented `SET_ACTIVE_SPOOL ID=<id>` command, based on issue #12.
+- Migrated existing PipSpool-managed start-G-code blocks during synchronization while preserving unrelated and per-spool custom start G-code.
+- Renamed the dashboard control to **Active spool G-code** and retained the existing saved toggle setting.
 - Added optional OrcaSlicer lifecycle-event integration for saved presets, active filament/printer context, project changes, device changes and completed jobs.
 - Debounced lifecycle refreshes and kept normalized Orca/Spoolman comparison as the sole authority for synchronization warnings, preventing events from creating false-positive banners.
 - Limited automatic preset-save detection to filament presets and included the saved preset name when a real synchronization difference is found.

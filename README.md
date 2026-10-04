@@ -20,7 +20,7 @@ filament usage.
 - Automatic removal of the matching profile when a spool is archived.
 - Sortable names such as `(#42) PLA Galaxy Blue - Manufacturer - PipSpool`.
 - Nozzle and bed temperatures imported from the correct Spoolman material.
-- Managed `SET_SPOOL_ID ID=42` or optional per-spool custom Start G-code, with
+- Managed Moonraker `SET_ACTIVE_SPOOL ID=42` or optional per-spool custom Start G-code, with
   a visible dashboard toggle for printers and firmware that do not support the command.
 - Optional synchronization for selected fields across every Orca filament tab.
 - Bidirectional advanced-field updates: one-sided Spoolman changes can update
@@ -53,8 +53,9 @@ one place:
 - Colour-aware **Printer Gates/Toolheads** overview using assignments already
   reported by Spoolman.
 - **Feedback**, **Refresh** and **Synchronize now** actions.
-- A prominent **Spool ID G-code** toggle that is enabled by default and removes
-  only PipSpool-managed `SET_SPOOL_ID` commands when switched off.
+- A prominent **Active spool G-code** toggle that is enabled by default and
+  removes PipSpool-managed `SET_ACTIVE_SPOOL` or legacy `SET_SPOOL_ID` commands
+  when switched off.
 - A diagnostic pending-synchronization notice that identifies affected spools
   and changed fields, kept separate from the restart-required notice.
 - Last synchronization metrics, report and visible errors.
