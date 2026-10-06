@@ -17,10 +17,12 @@ filament usage.
 
 - One OrcaSlicer filament profile for each active Spoolman spool.
 - Stable spool-ID matching, so updates and renames do not create duplicates.
+- Lifecycle-aware refreshes after supported Orca preset and project events, with
+  a compatibility path for older Orca builds.
 - Automatic removal of the matching profile when a spool is archived.
 - Sortable names such as `(#42) PLA Galaxy Blue - Manufacturer - PipSpool`.
 - Nozzle and bed temperatures imported from the correct Spoolman material.
-- Managed `SET_SPOOL_ID ID=42` or optional per-spool custom Start G-code, with
+- Managed `SET_ACTIVE_SPOOL ID=42` or optional per-spool custom Start G-code, with
   a visible dashboard toggle for printers and firmware that do not support the command.
 - Optional synchronization for selected fields across every Orca filament tab.
 - Bidirectional advanced-field updates: one-sided Spoolman changes can update
@@ -53,8 +55,8 @@ one place:
 - Colour-aware **Printer Gates/Toolheads** overview using assignments already
   reported by Spoolman.
 - **Feedback**, **Refresh** and **Synchronize now** actions.
-- A prominent **Spool ID G-code** toggle that is enabled by default and removes
-  only PipSpool-managed `SET_SPOOL_ID` commands when switched off.
+- A prominent **Active spool G-code** toggle that is enabled by default and removes
+  only PipSpool-managed `SET_ACTIVE_SPOOL` commands when switched off.
 - A diagnostic pending-synchronization notice that identifies affected spools
   and changed fields, kept separate from the restart-required notice.
 - Last synchronization metrics, report and visible errors.
@@ -93,7 +95,9 @@ Printers and Compatible Prints retain their full values in both directions.
 4. Activate PipSpool and follow the connection steps above.
 
 The setup window opens automatically only when no valid settings have been
-saved. It remains available through PipSpool's setup action.
+saved. It remains available through PipSpool's setup action. PipSpool stores
+critical user settings through Orca's supported capability configuration and
+keeps its existing settings file as a compatibility mirror.
 
 > Do not run PipSpool alongside another plugin that creates Orca profiles from
 > the same Spoolman spools.
@@ -134,9 +138,18 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.9 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
-and macOS Apple Silicon. It is confirmed on OrcaSlicer 2.5.0 nightly build
-`4deadc9d` on Windows x86-64 with Spoolman, Klipper, Moonraker and Happy Hare.
+PipSpool 2.2.10 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+and macOS Apple Silicon. Lifecycle-aware refreshes activate automatically when
+Orca exposes that API; manual synchronization and the compatibility checks
+remain available on older plugin builds. The previous 2.2.9 stable behavior was
+confirmed on OrcaSlicer 2.5.0 nightly build `4deadc9d` on Windows x86-64 with
+Spoolman, Klipper, Moonraker and Happy Hare.
+
+Linux/WebKit Settings-window reload recovery requires an Orca build containing
+[OrcaSlicer PR #15737](https://github.com/OrcaSlicer/OrcaSlicer/pull/15737).
+The recurring `socket.__new__` permission prompt is an open Orca issue tracked
+in [OrcaSlicer issue #15724](https://github.com/OrcaSlicer/OrcaSlicer/issues/15724);
+PipSpool does not bypass or conceal that security request.
 
 OrcaSlicer's Python plugin API is new and may change in future builds.
 

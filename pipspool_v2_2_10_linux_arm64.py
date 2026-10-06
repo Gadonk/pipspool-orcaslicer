@@ -4,7 +4,7 @@
 # name = "PipSpool"
 # description = "Spoolman synchronization plugin for OrcaSlicer"
 # author = "Donko"
-# version = "2.2.9"
+# version = "2.2.10"
 # ///
 
 """PipSpool: synchronize Spoolman inventory into OrcaSlicer presets.
@@ -64,7 +64,7 @@ finally:
 # Public default. Configure the Spoolman server address in PipSpool Settings.
 DEFAULT_SPOOLMAN_URL = "http://localhost:7912"
 DEFAULT_LOW_STOCK_THRESHOLD_GRAMS = 100.0
-PLUGIN_VERSION = "2.2.9"
+PLUGIN_VERSION = "2.2.10"
 COPYRIGHT_YEAR = 2026
 FEEDBACK_URL = "https://github.com/Gadonk/pipspool-orcaslicer/issues"
 LATEST_RELEASE_API = "https://api.github.com/repos/Gadonk/pipspool-orcaslicer/releases/latest"
@@ -156,6 +156,8 @@ START_MARKER = "; PipSpool: begin managed spool ID"
 END_MARKER = "; PipSpool: end managed spool ID"
 LEGACY_START_MARKER = "; Spoolman Bridge: begin managed spool ID"
 LEGACY_END_MARKER = "; Spoolman Bridge: end managed spool ID"
+ACTIVE_SPOOL_GCODE = "SET_ACTIVE_SPOOL"
+LEGACY_SPOOL_GCODE = "SET_SPOOL_ID"
 ORCA_FIELD_PREFIX = "orca_"
 LIVE_SYSTEM_FILAMENT_PRESETS: dict[str, list[str]] = {}
 # Orca's inheritance choice is local preset structure, not data represented by
@@ -417,6 +419,12 @@ PERSISTENT_DIR = ORCA_DATA_DIR / "pipspool"
 SETTINGS_PATH = PERSISTENT_DIR / SETTINGS_FILENAME
 PAGE_ICON_PATH = PERSISTENT_DIR / "pipspool_page_icon.svg"
 LOG_PATH = PERSISTENT_DIR / LOG_FILENAME
+HOST_CONFIG_KEYS = (
+    "spoolman_url",
+    "show_pipspool_page",
+    "low_stock_threshold_grams",
+)
+HOST_USER_SETTINGS: dict[str, Any] = {}
 
 
 def legacy_settings_paths() -> list[Path]:
@@ -486,6 +494,11 @@ def load_settings() -> dict[str, Any]:
             log(f"[SETTINGS] Migrated persistent settings to {SETTINGS_PATH}")
         except OSError as exc:
             log(f"[SETTINGS MIGRATION] {exc}")
+    # Orca's capability configuration is the durable source for user-entered
+    # connection/display settings.  The JSON file still owns synchronization
+    # state shared by the other PipSpool capabilities, but must not be able to
+    # replace a value that Orca has already restored for this session.
+    settings.update(HOST_USER_SETTINGS)
     return settings
 
 
@@ -566,6 +579,11 @@ def check_for_update(force: bool = False) -> str | None:
 
 def has_saved_settings() -> bool:
     try:
+        if normalize_url(HOST_USER_SETTINGS.get("spoolman_url", "")):
+            return True
+    except (ValueError, TypeError):
+        pass
+    try:
         stored = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
         return isinstance(stored, dict) and bool(
             normalize_url(stored.get("spoolman_url", ""))
@@ -637,10 +655,14 @@ def managed_start_gcode(
     if not inject_spool_id and custom_text:
         custom_text = "\n".join(
             line for line in custom_text.splitlines()
-            if not re.match(r"^\s*SET_SPOOL_ID(?:\s|$)", line, re.IGNORECASE)
+            if not re.match(
+                rf"^\s*(?:{ACTIVE_SPOOL_GCODE}|{LEGACY_SPOOL_GCODE})(?:\s|$)",
+                line,
+                re.IGNORECASE,
+            )
         ).strip()
     managed_text = custom_text or (
-        f"SET_SPOOL_ID ID={int(spool_id)}" if inject_spool_id else ""
+        f"{ACTIVE_SPOOL_GCODE} ID={int(spool_id)}" if inject_spool_id else ""
     )
     if not managed_text:
         return [preserved]
@@ -1829,6 +1851,163 @@ def show_message(message: str, title: str = "PipSpool", icon: str = "info") -> N
     orca.host.ui.message(message, title=title, icon=icon)
 
 
+LIFECYCLE_DEBOUNCE_SECONDS = 1.0
+LIFECYCLE_SUPPORTED = getattr(orca, "LifecycleEvent", None) is not None
+
+
+def lifecycle_event_name(event: Any) -> str:
+    """Return a stable event name without importing nightly-only enum members."""
+    name = getattr(event, "name", None)
+    if name:
+        return str(name)
+    text = str(event or "")
+    if "." in text:
+        text = text.rsplit(".", 1)[-1]
+    return text.strip(" <>:'\"")
+
+
+def lifecycle_context_text(context: Any, attribute: str) -> str:
+    value = getattr(context, attribute, "")
+    return str(value or "").strip()
+
+
+def host_has_filament_preset(name: str) -> bool:
+    """Resolve PresetSaved's missing type from Orca after the callback returns."""
+    if not name:
+        return False
+    try:
+        collection = orca.host.preset_bundle().filaments
+        return collection.find_preset(name) is not None
+    except Exception as exc:
+        log(f"[LIFECYCLE PRESET LOOKUP] {exc}")
+        return False
+
+
+class LifecycleCoordinator:
+    """Debounce Orca events and refresh PipSpool outside their callbacks."""
+
+    REFRESH_EVENTS = {
+        "NewProject",
+        "ProjectOpened",
+        "DeviceSelected",
+        "SlicingJobComplete",
+        "UploadFinished",
+        "PrintJobFinished",
+    }
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._timer: threading.Timer | None = None
+        self._page = None
+        self._pending_sync_reason = ""
+        self._pending_saved_preset = ""
+        self._last_event = ""
+        self._last_subject = ""
+        self._last_source = ""
+        self._active_filament = ""
+        self._active_printer = ""
+
+    def register_page(self, page: Any) -> None:
+        with self._lock:
+            self._page = page
+
+    def unregister_page(self, page: Any) -> None:
+        with self._lock:
+            if self._page is page:
+                self._page = None
+
+    def shutdown(self) -> None:
+        with self._lock:
+            timer, self._timer = self._timer, None
+            self._page = None
+            self._pending_sync_reason = ""
+            self._pending_saved_preset = ""
+        if timer is not None:
+            timer.cancel()
+
+    def handle(self, event: Any, context: Any) -> None:
+        """Record only cheap context data, then debounce all real work."""
+        event_name = lifecycle_event_name(event)
+        subject = lifecycle_context_text(context, "name")
+        source = lifecycle_context_text(context, "msg").casefold()
+
+        if event_name == "PresetSaved":
+            # Orca currently sends "new" or "overwrite" in ctx.msg for this
+            # event, not the preset type. A future payload may include the
+            # type, so reject only an explicit, known non-filament type here.
+            if source in {"print", "sla_print", "sla_material", "printer"}:
+                return
+            reason = ""
+        elif event_name == "PresetSelected":
+            if source not in {"filament", "printer"}:
+                return
+            reason = ""
+        elif event_name in self.REFRESH_EVENTS:
+            reason = ""
+        else:
+            return
+
+        with self._lock:
+            self._last_event = event_name
+            self._last_subject = subject
+            self._last_source = source
+            if event_name == "PresetSelected" and source == "filament":
+                self._active_filament = subject
+            elif event_name == "PresetSelected" and source == "printer":
+                self._active_printer = subject
+            if event_name == "PresetSaved":
+                self._pending_saved_preset = subject
+            if reason:
+                self._pending_sync_reason = reason
+            if self._timer is not None:
+                self._timer.cancel()
+            timer = threading.Timer(LIFECYCLE_DEBOUNCE_SECONDS, self._dispatch)
+            timer.daemon = True
+            self._timer = timer
+            timer.start()
+
+    def _dispatch(self) -> None:
+        with self._lock:
+            self._timer = None
+            page = self._page
+            saved_preset = self._pending_saved_preset
+            self._pending_saved_preset = ""
+        if saved_preset:
+            if not host_has_filament_preset(saved_preset):
+                return
+            with self._lock:
+                self._pending_sync_reason = (
+                    f"Orca filament preset saved: {saved_preset}"
+                )
+        if page is None:
+            return
+        try:
+            page._refresh_from_lifecycle()
+        except Exception as exc:
+            log(f"[LIFECYCLE REFRESH ERROR] {exc}")
+
+    def consume_sync_reason(self, synchronization_required: bool) -> str:
+        with self._lock:
+            reason = self._pending_sync_reason
+            self._pending_sync_reason = ""
+        return reason if synchronization_required else ""
+
+    def diagnostics(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "supported": LIFECYCLE_SUPPORTED,
+                "mode": "events" if LIFECYCLE_SUPPORTED else "compatibility",
+                "last_event": self._last_event,
+                "last_subject": self._last_subject,
+                "last_source": self._last_source,
+                "active_filament": self._active_filament,
+                "active_printer": self._active_printer,
+            }
+
+
+LIFECYCLE_COORDINATOR = LifecycleCoordinator()
+
+
 def parse_field_config(value: Any) -> tuple[tuple[str, ...], bool]:
     try:
         config = json.loads(value) if isinstance(value, str) else value
@@ -1992,6 +2171,18 @@ def save_advanced_field_selection(
 class SyncCapability(orca.script.ScriptPluginCapabilityBase):
     def get_name(self):
         return "Sync Spoolman Profiles"
+
+    def on_load(self):
+        mode = "enabled" if LIFECYCLE_SUPPORTED else "compatibility fallback"
+        log(f"[LIFECYCLE] Orca lifecycle integration {mode}")
+
+    def on_unload(self):
+        LIFECYCLE_COORDINATOR.shutdown()
+
+    def on_lifecycle_event(self, event, context):
+        # This callback may run on an Orca worker thread. The coordinator only
+        # copies its small payload here and performs refresh work after debounce.
+        LIFECYCLE_COORDINATOR.handle(event, context)
 
     def has_config_ui(self):
         return True
@@ -2481,6 +2672,16 @@ def pipspool_page_state(notice=None, friendly_initial_error=False) -> dict[str, 
         for _, value in sorted(statuses.items())
         if value.get("status") in {"profile_missing", "update_required"}
     ]
+    synchronization_required = any(
+        value.get("status") in {"profile_missing", "update_required"}
+        for value in statuses.values()
+    )
+    lifecycle_reason = LIFECYCLE_COORDINATOR.consume_sync_reason(
+        synchronization_required
+    )
+    if lifecycle_reason:
+        synchronization_reasons.insert(0, lifecycle_reason)
+    lifecycle = LIFECYCLE_COORDINATOR.diagnostics()
     return {
         "type": "state",
         "connected": connected,
@@ -2491,11 +2692,15 @@ def pipspool_page_state(notice=None, friendly_initial_error=False) -> dict[str, 
         "low_stock_threshold": low_stock_threshold(settings),
         "spool_table_columns": spool_table_columns(settings),
         "restart_required": restart_required(settings),
-        "synchronization_required": any(
-            value.get("status") in {"profile_missing", "update_required"}
-            for value in statuses.values()
-        ),
+        "synchronization_required": synchronization_required,
         "synchronization_reasons": synchronization_reasons,
+        "lifecycle_supported": lifecycle["supported"],
+        "lifecycle_mode": lifecycle["mode"],
+        "lifecycle_last_event": lifecycle["last_event"],
+        "lifecycle_last_subject": lifecycle["last_subject"],
+        "lifecycle_last_source": lifecycle["last_source"],
+        "lifecycle_active_filament": lifecycle["active_filament"],
+        "lifecycle_active_printer": lifecycle["active_printer"],
         "available_update": available_update(settings),
         "last_report": settings.get("last_sync_report"),
         "spools": [
@@ -2752,7 +2957,7 @@ table{{width:100%;border-collapse:separate;border-spacing:0}}th,td{{padding:9px 
 @media(max-width:1100px){{.connection-layout{{grid-template-columns:1fr}}.gate-panel{{padding:17px 0 0;border-left:0;border-top:1px solid var(--orca-border)}}.spool-id-control{{top:12px}}.gate-grid{{grid-template-columns:repeat(4,minmax(108px,1fr))}}}}@media(max-width:850px){{.grid{{grid-template-columns:1fr}}.top-actions{{margin-left:0}}header{{flex-wrap:wrap}}.gate-panel>p{{padding-right:0;margin-top:58px}}.spool-id-control{{left:0;right:auto}}.gate-grid{{grid-template-columns:repeat(2,minmax(108px,1fr))}}.spool-controls{{align-items:flex-start;flex-direction:column}}.sort-controls{{width:100%}}.sort-controls select{{flex:1}}}}
 </style></head><body class="pipspool-page"><main>
 <header><img class="logo" src="{PIPSPOOL_LOGO_DATA_URI}" alt="PipSpool"><div><h1>PipSpool</h1><p class="sub">Spoolman synchronization for OrcaSlicer</p></div><div class="top-actions"><button id="feedback">Feedback</button><button id="refresh">Refresh</button><button id="sync" class="primary">Synchronize now</button></div></header>
-<div class="grid"><div id="updateBanner" class="update-banner"{"" if initial_available_update else " hidden"}><span class="update-symbol">↑</span><span id="updateText">PipSpool {escape(str(initial_available_update or ''))} is available — open File → Plugins to update.</span></div><div id="syncBanner" class="sync-banner"{"" if initial_synchronization_required and not initial_restart_required else " hidden"}><span class="sync-symbol">⇄</span><span id="syncText">{escape(initial_sync_text)}</span></div><div id="restartBanner" class="restart-banner"{"" if initial_restart_required else " hidden"}><span class="restart-symbol">↻</span><span>Filament profiles changed — restart OrcaSlicer to load them.</span></div><section class="card wide"><div class="connection-layout"><div class="connection-side"><h2>Connection</h2><div class="status-line"><img id="statusPip" class="status-pip" src="{initial_pip}" alt="Pip connection status"><div class="status-copy"><b id="status">{initial_status}</b><p id="connectionDetail" class="muted">{initial_detail}</p><p class="muted">Server settings, can be found in the PipSpool plugin settings.</p></div></div></div><div id="loadoutCard" class="gate-panel"><h2>Printer Gates/Toolheads</h2><p class="muted">A quick view of the gate assignments reported by Spoolman.</p><label class="spool-id-control" title="Add SET_SPOOL_ID to PipSpool filament profiles"><span class="spool-id-control-copy"><b>Spool ID G-code</b><span id="spoolIdState">{"Enabled" if initial_spool_id_gcode else "Disabled"}</span></span><span class="switch"><input id="spoolIdGcode" type="checkbox"{" checked" if initial_spool_id_gcode else ""}><span class="switch-track"></span></span></label><div id="loadout" class="gate-grid">{loadout_cards_html}</div><p id="loadoutEmpty" class="muted"{" hidden" if loadout_cards_html else ""}>No active spools are assigned to a printer gate in Spoolman.</p></div></div></section>
+<div class="grid"><div id="updateBanner" class="update-banner"{"" if initial_available_update else " hidden"}><span class="update-symbol">↑</span><span id="updateText">PipSpool {escape(str(initial_available_update or ''))} is available — open File → Plugins to update.</span></div><div id="syncBanner" class="sync-banner"{"" if initial_synchronization_required and not initial_restart_required else " hidden"}><span class="sync-symbol">⇄</span><span id="syncText">{escape(initial_sync_text)}</span></div><div id="restartBanner" class="restart-banner"{"" if initial_restart_required else " hidden"}><span class="restart-symbol">↻</span><span>Filament profiles changed — restart OrcaSlicer to load them.</span></div><section class="card wide"><div class="connection-layout"><div class="connection-side"><h2>Connection</h2><div class="status-line"><img id="statusPip" class="status-pip" src="{initial_pip}" alt="Pip connection status"><div class="status-copy"><b id="status">{initial_status}</b><p id="connectionDetail" class="muted">{initial_detail}</p><p class="muted">Server settings, can be found in the PipSpool plugin settings.</p></div></div></div><div id="loadoutCard" class="gate-panel"><h2>Printer Gates/Toolheads</h2><p class="muted">A quick view of the gate assignments reported by Spoolman.</p><label class="spool-id-control" title="Add Moonraker's SET_ACTIVE_SPOOL command to PipSpool filament profiles"><span class="spool-id-control-copy"><b>Active spool G-code</b><span id="spoolIdState">{"Enabled" if initial_spool_id_gcode else "Disabled"}</span></span><span class="switch"><input id="spoolIdGcode" type="checkbox"{" checked" if initial_spool_id_gcode else ""}><span class="switch-track"></span></span></label><div id="loadout" class="gate-grid">{loadout_cards_html}</div><p id="loadoutEmpty" class="muted"{" hidden" if loadout_cards_html else ""}>No active spools are assigned to a printer gate in Spoolman.</p></div></div></section>
 <section class="card"><h2>Active spools</h2><div class="toolbar"><input id="search" type="search" placeholder="Search by spool number, material, colour, manufacturer, name, location, gate or profile status"><details class="columns-menu"><summary>Columns</summary><div class="column-choices">{''.join(f'<label><input type="checkbox" data-table-column="{column}"{" checked" if column in initial_table_columns else ""}>{SPOOL_TABLE_COLUMN_LABELS[column]}</label>' for column in SPOOL_TABLE_COLUMNS)}</div></details></div><div class="spool-controls"><div class="spool-filters" role="group" aria-label="Filter active spools"><button type="button" class="spool-filter active" data-spool-filter="all" aria-pressed="true">All<span class="filter-count" data-filter-count="all">0</span></button><button type="button" class="spool-filter" data-spool-filter="loaded" aria-pressed="false">Loaded<span class="filter-count" data-filter-count="loaded">0</span></button><button type="button" class="spool-filter" data-spool-filter="low" aria-pressed="false">Low filament<span class="filter-count" data-filter-count="low">0</span></button><button type="button" class="spool-filter" data-spool-filter="sync" aria-pressed="false">Needs synchronization<span class="filter-count" data-filter-count="sync">0</span></button><button type="button" class="spool-filter" data-spool-filter="problems" aria-pressed="false">Profile problems<span class="filter-count" data-filter-count="problems">0</span></button></div><div class="sort-controls"><label for="spoolSort">Sort by</label><select id="spoolSort"><option value="id">Spool number</option><option value="material">Material</option><option value="remaining">Remaining weight</option><option value="vendor">Manufacturer</option><option value="gate">Gate/toolhead</option></select><button id="sortDirection" class="sort-direction" type="button" title="Ascending order" aria-label="Ascending order">↑</button></div></div><div class="spool-wrap"><table><thead><tr><th>Spool</th><th>Material</th><th data-column="filament">Filament</th><th data-column="manufacturer">Manufacturer</th><th data-column="colour">Colour</th><th data-column="nozzle">Nozzle</th><th data-column="bed">Bed</th><th data-column="remaining">Remaining</th><th data-column="location">Location</th><th data-column="loaded">Gate/Toolhead</th><th data-column="sync">Profile status</th></tr></thead><tbody id="spools">{spool_rows_html}</tbody></table></div><p id="empty" class="muted"{" hidden" if initial_spools else ""}>No matching active spools.</p></section>
 <section class="card"><h2>Last synchronization</h2><div class="metrics"><div class="metric"><b id="active">{initial_active}</b><span>Active spools</span></div><div class="metric"><b id="changed">{initial_changed}</b><span>Changed spools</span></div><div class="metric"><b id="errors">{len(initial_errors) if isinstance(initial_report, dict) else '—'}</b><span>Errors</span></div></div><pre id="report" class="report">{escape(initial_report_text)}</pre></section>
 <section class="card wide"><h2>Advanced field synchronization</h2><p class="muted">Each physical spool has its own Orca profile. Selected Advanced values are stored on the shared Spoolman Filament, so changing one profile can update every profile using that Filament. Inventory belongs to the individual spool; ordinary filament temperatures still come from Spoolman.</p><nav class="field-tabs" role="tablist" aria-label="Orca filament setting sections">{''.join(field_tabs)}</nav><div class="field-workspace">{''.join(field_panels)}</div><div class="field-footer"><span id="selectionCount" class="muted">{len(selected_fields)} field{"" if len(selected_fields) == 1 else "s"} selected</span><button id="saveFields">Save field selection</button></div></section>
@@ -2840,7 +3045,7 @@ function compareSpools(left,right){{
   return result*state.sortDirection;
 }}
 function renderSpools(){{
-  var q=byId('search').value.toLowerCase().replace(/^\s+|\s+$/g,'');
+  var q=byId('search').value.toLowerCase().replace(/^\\s+|\\s+$/g,'');
   var body=byId('spools');
   var count=0;
   var spools=state.spools.slice().sort(compareSpools);
@@ -2962,7 +3167,7 @@ function applyState(data){{
     if(report.changed_spools!=null)changedSpools=report.changed_spools;
     else if(report.changes){{
       var changedIds={{}},changeIndex,changeMatch;
-      for(changeIndex=0;changeIndex<report.changes.length;changeIndex++){{changeMatch=/^Spool #(\d+):/.exec(report.changes[changeIndex]);if(changeMatch)changedIds[changeMatch[1]]=true;}}
+      for(changeIndex=0;changeIndex<report.changes.length;changeIndex++){{changeMatch=/^Spool #(\\d+):/.exec(report.changes[changeIndex]);if(changeMatch)changedIds[changeMatch[1]]=true;}}
       changedSpools=Object.keys(changedIds).length;
     }}
   }}
@@ -3085,6 +3290,10 @@ if PAGES_BASE is not None:
     class PipSpoolPageCapability(PAGES_BASE):
         def __init__(self):
             super().__init__()
+            LIFECYCLE_COORDINATOR.register_page(self)
+
+        def on_unload(self):
+            LIFECYCLE_COORDINATOR.unregister_page(self)
 
         def get_name(self):
             return "PipSpool"
@@ -3116,6 +3325,11 @@ if PAGES_BASE is not None:
             self.post_message(payload)
 
         def _post_initial_state(self):
+            self._post_state()
+
+        def _refresh_from_lifecycle(self):
+            # Called by the coordinator's debounce worker, never directly from
+            # Orca's lifecycle callback. post_message marshals delivery to UI.
             self._post_state()
 
         def _background(self, operation):
@@ -3188,9 +3402,9 @@ if PAGES_BASE is not None:
                 enabled = message.get("enabled") is True
                 save_settings({"inject_spool_id_gcode": enabled})
                 notice = (
-                    "Spool ID G-code enabled. Synchronize to update filament profiles."
+                    "Active spool G-code enabled. Synchronize to update filament profiles."
                     if enabled else
-                    "Spool ID G-code disabled. Synchronize to remove PipSpool's managed command."
+                    "Active spool G-code disabled. Synchronize to remove PipSpool's managed command."
                 )
                 self._post_state("state", notice)
             elif action == "sync":
@@ -3213,12 +3427,85 @@ if PAGES_BASE is not None:
                 self._background(cleanup)
 
 
+def settings_window_state() -> dict[str, Any]:
+    settings = load_settings()
+    lifecycle = LIFECYCLE_COORDINATOR.diagnostics()
+    return {
+        "type": "settings-state",
+        "spoolman_url": settings.get("spoolman_url", DEFAULT_SPOOLMAN_URL),
+        "show_pipspool_page": settings.get("show_pipspool_page", True) is not False,
+        "low_stock_threshold_grams": low_stock_threshold(settings),
+        "lifecycle_supported": lifecycle["supported"],
+        "lifecycle_mode": lifecycle["mode"],
+    }
+
+
 class SettingsCapability(orca.script.ScriptPluginCapabilityBase):
     def get_name(self):
         return "PipSpool Settings"
 
+    def _restore_host_settings(self) -> bool:
+        """Restore user settings from Orca's supported capability config."""
+        getter = getattr(self, "get_config", None)
+        if not callable(getter):
+            return False
+        try:
+            stored = getter()
+            stored = json.loads(stored) if isinstance(stored, str) else stored
+            if not isinstance(stored, dict):
+                return False
+            restored: dict[str, Any] = {}
+            if "spoolman_url" in stored:
+                restored["spoolman_url"] = normalize_url(stored["spoolman_url"])
+            if isinstance(stored.get("show_pipspool_page"), bool):
+                restored["show_pipspool_page"] = stored["show_pipspool_page"]
+            threshold = numeric(stored.get("low_stock_threshold_grams"))
+            if threshold is not None and threshold >= 0:
+                restored["low_stock_threshold_grams"] = round(threshold, 1)
+            if not restored:
+                return False
+            HOST_USER_SETTINGS.clear()
+            HOST_USER_SETTINGS.update(restored)
+            try:
+                save_settings(restored)
+            except OSError as exc:
+                # The host configuration remains available even if a Linux
+                # installation cannot update PipSpool's legacy shared file.
+                log(f"[SETTINGS FILE MIRROR] {exc}")
+            return "spoolman_url" in restored
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            log(f"[HOST SETTINGS LOAD] {exc}")
+            return False
+
+    def _save_host_settings(self, update: dict[str, Any]) -> bool:
+        """Persist user settings through Orca and refresh the runtime cache."""
+        saver = getattr(self, "save_config", None)
+        if not callable(saver):
+            return False
+        current = load_settings()
+        host_settings = {
+            key: current[key]
+            for key in HOST_CONFIG_KEYS
+            if key in current
+        }
+        host_settings.update({key: update[key] for key in HOST_CONFIG_KEYS if key in update})
+        try:
+            if not saver(json.dumps(host_settings, separators=(",", ":"))):
+                return False
+        except Exception as exc:
+            log(f"[HOST SETTINGS SAVE] {exc}")
+            return False
+        HOST_USER_SETTINGS.clear()
+        HOST_USER_SETTINGS.update(host_settings)
+        return True
+
     def on_load(self):
-        if not has_saved_settings():
+        restored = self._restore_host_settings()
+        if not restored and has_saved_settings():
+            # Migrate existing PipSpool installations into Orca's durable
+            # capability configuration without making the user re-enter data.
+            self._save_host_settings(load_settings())
+        elif not restored:
             self._open_settings_window()
 
     def execute(self):
@@ -3226,6 +3513,7 @@ class SettingsCapability(orca.script.ScriptPluginCapabilityBase):
         return orca.ExecutionResult.success("PipSpool settings opened")
 
     def _open_settings_window(self):
+        self._restore_host_settings()
         current_settings = load_settings()
         current_url = current_settings.get("spoolman_url", DEFAULT_SPOOLMAN_URL)
         show_page = current_settings.get("show_pipspool_page", True) is not False
@@ -3282,6 +3570,10 @@ button:hover {{ background:rgba(255,255,255,.06); }}
 Blank Spoolman fields inherit from Orca; populated fields are preserved as overrides.</p>
 <div class="example">Use “Reset Spoolman Filament Settings from Orca” only when you
 want to replace all PipSpool-managed overrides for active filaments.</div></div>
+<div class="card sync-card"><p class="card-title">Orca change detection</p>
+<p class="help">New Orca builds notify PipSpool when filament presets are saved.
+Older Orca versions continue to use PipSpool's compatibility checks.</p>
+<div id="lifecycleStatus" class="example">Checking Orca lifecycle support…</div></div>
 <div class="card display-card"><p class="card-title">PipSpool page</p>
 <p class="help">Choose whether PipSpool adds its dashboard to OrcaSlicer's top navigation.</p>
 <label class="toggle" for="showPage"><input id="showPage" type="checkbox"{show_page_checked}>
@@ -3296,21 +3588,54 @@ want to replace all PipSpool-managed overrides for active filaments.</div></div>
 <div class="right"><button onclick="send('cancel')">Cancel</button>
 <button class="primary" onclick="send('save')">Save settings</button></div></div>
 <script>
-const url = document.getElementById('url');
-const showPage = document.getElementById('showPage');
-const lowStockThreshold = document.getElementById('lowStockThreshold');
-function send(action) {{ window.orca.postMessage({{action:action,url:url.value,show_pipspool_page:showPage.checked,low_stock_threshold_grams:lowStockThreshold.value}}); }}
-url.addEventListener('keydown', event => {{ if (event.key === 'Enter') send('save'); }});
+var url = document.getElementById('url');
+var showPage = document.getElementById('showPage');
+var lowStockThreshold = document.getElementById('lowStockThreshold');
+var lifecycleStatus = document.getElementById('lifecycleStatus');
+function settingsPayload(action) {{
+  return {{action:action,url:url.value,show_pipspool_page:showPage.checked,low_stock_threshold_grams:lowStockThreshold.value}};
+}}
+function send(action) {{
+  if(window.orca&&typeof window.orca.postMessage==='function')window.orca.postMessage(settingsPayload(action));
+  else lifecycleStatus.textContent='Settings bridge is not available in this Orca build.';
+}}
+function applySettingsState(data) {{
+  if(!data||data.type!=='settings-state')return;
+  url.value=data.spoolman_url||{json.dumps(DEFAULT_SPOOLMAN_URL)};
+  showPage.checked=data.show_pipspool_page!==false;
+  lowStockThreshold.value=data.low_stock_threshold_grams==null?{DEFAULT_LOW_STOCK_THRESHOLD_GRAMS}:data.low_stock_threshold_grams;
+  lifecycleStatus.textContent=data.lifecycle_supported===true
+    ?'Lifecycle events enabled — saved Orca filament presets trigger a debounced status check.'
+    :'Compatibility mode — use Refresh after changing Orca or Spoolman.';
+}}
+function startSettingsBridge(attempt) {{
+  attempt=attempt||0;
+  if(window.orca&&typeof window.orca.postMessage==='function'&&typeof window.orca.onMessage==='function'){{
+    window.orca.onMessage(applySettingsState);
+    window.orca.postMessage({{action:'load-settings'}});
+    return;
+  }}
+  if(attempt<100)window.setTimeout(function(){{startSettingsBridge(attempt+1);}},100);
+  else lifecycleStatus.textContent='Settings bridge is not available in this Orca build.';
+}}
+url.addEventListener('keydown', function(event) {{ if (event.key === 'Enter') send('save'); }});
+document.addEventListener('DOMContentLoaded', function() {{ startSettingsBridge(0); }});
 </script>
 </body></html>"""
 
         def on_message(data):
             if not isinstance(data, dict):
                 return
-            if data.get("action") == "cancel":
+            action = data.get("action")
+            if action == "load-settings":
+                post = getattr(window, "post", None)
+                if callable(post):
+                    post(settings_window_state())
+                return
+            if action == "cancel":
                 window.close()
                 return
-            if data.get("action") == "test":
+            if action == "test":
                 try:
                     test_url = normalize_url(data.get("url", ""))
                 except Exception as exc:
@@ -3334,21 +3659,32 @@ url.addEventListener('keydown', event => {{ if (event.key === 'Enter') send('sav
 
                 threading.Thread(target=test_connection, daemon=True).start()
                 return
-            if data.get("action") == "save":
+            if action == "save":
                 try:
                     updated_show_page = bool(data.get("show_pipspool_page", True))
-                    visibility_changed = show_page != updated_show_page
+                    saved_show_page = (
+                        load_settings().get("show_pipspool_page", True) is not False
+                    )
+                    visibility_changed = saved_show_page != updated_show_page
                     updated_low_stock_threshold = numeric(
                         data.get("low_stock_threshold_grams")
                     )
                     if updated_low_stock_threshold is None or updated_low_stock_threshold < 0:
                         raise ValueError("Low-stock warning threshold must be 0 grams or more")
                     settings_update = {
-                        "spoolman_url": data.get("url", ""),
+                        "spoolman_url": normalize_url(data.get("url", "")),
                         "show_pipspool_page": updated_show_page,
                         "low_stock_threshold_grams": round(updated_low_stock_threshold, 1),
                     }
-                    save_settings(settings_update)
+                    host_saved = self._save_host_settings(settings_update)
+                    file_saved = False
+                    try:
+                        save_settings(settings_update)
+                        file_saved = True
+                    except OSError as exc:
+                        log(f"[SETTINGS FILE SAVE] {exc}")
+                    if not host_saved and not file_saved:
+                        raise RuntimeError("OrcaSlicer could not save PipSpool settings")
                     window.close()
                     message = "PipSpool settings saved."
                     if visibility_changed:
