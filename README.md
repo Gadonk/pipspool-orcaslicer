@@ -147,6 +147,8 @@ Spoolman, Klipper, Moonraker and Happy Hare.
 
 Linux/WebKit Settings-window reload recovery requires an Orca build containing
 [OrcaSlicer PR #15737](https://github.com/OrcaSlicer/OrcaSlicer/pull/15737).
+PipSpool does not eagerly request access to installation-specific Python IDNA
+files at startup; this avoids an unstable Linux AppImage permission target.
 The recurring `socket.__new__` permission prompt is an open Orca issue tracked
 in [OrcaSlicer issue #15724](https://github.com/OrcaSlicer/OrcaSlicer/issues/15724);
 PipSpool does not bypass or conceal that security request.

@@ -8,6 +8,7 @@ All notable PipSpool changes are documented here.
 - Added concrete synchronization reasons for saved Orca filament presets while keeping preset selection informational and retaining the compatibility path for Orca builds without lifecycle events.
 - Made the Settings window reload-safe after Orca restores its HTML on Linux/WebKit by requesting the current Python/backend state whenever the document is recreated.
 - Stored the Spoolman address, dashboard visibility and low-stock threshold through Orca's supported capability configuration, automatically migrating existing settings and retaining PipSpool's shared JSON file as a compatibility mirror.
+- Removed PipSpool's eager startup request for installation-specific Python IDNA files, avoiding an inherently unstable permission target on Linux AppImage launches.
 - Corrected the automatic Moonraker command from `SET_SPOOL_ID` to `SET_ACTIVE_SPOOL` for issue #12.
 - Migrated older PipSpool-managed G-code blocks on synchronization while preserving unrelated filament Start G-code and explicit per-spool custom G-code.
 - Renamed the dashboard control to **Active spool G-code** and retained its existing enabled/disabled setting.

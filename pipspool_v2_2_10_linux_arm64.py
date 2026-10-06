@@ -16,13 +16,14 @@ and Moonraker remain responsible for real-time Spoolman usage accounting.
 from __future__ import annotations
 
 import json
+import http.client
 import math
 import os
 import re
-import sys
 import threading
 import base64
 import time
+import urllib.parse
 import webbrowser
 from dataclasses import dataclass, field
 from html import escape
@@ -30,36 +31,6 @@ from pathlib import Path
 from typing import Any
 
 import orca
-
-
-# Ask once, during plugin loading, for the bundled IDNA files Python may read
-# before its HTTP connection audit event. Orca persists explicitly requested
-# filesystem permissions in the plugin install state across normal restarts.
-_python_lib = Path(os.__file__).parent
-_idna_source = _python_lib / "encodings" / "idna.py"
-_idna_bytecode = (
-    _python_lib
-    / "encodings"
-    / "__pycache__"
-    / f"idna.{sys.implementation.cache_tag}.pyc"
-)
-orca.request_permissions(
-    fs_read=[str(_idna_source), str(_idna_bytecode)]
-)
-
-# If Orca's bundled IDNA bytecode is stale, Python normally writes a temporary
-# ``.pyc.<random>`` file before replacing it. That path changes every launch
-# and therefore cannot be remembered by Orca's permission store. Preload IDNA
-# without writing bytecode, then restore the interpreter setting immediately.
-_original_dont_write_bytecode = sys.dont_write_bytecode
-try:
-    sys.dont_write_bytecode = True
-    import encodings.idna
-    import http.client
-    import urllib.parse
-finally:
-    sys.dont_write_bytecode = _original_dont_write_bytecode
-
 
 # Public default. Configure the Spoolman server address in PipSpool Settings.
 DEFAULT_SPOOLMAN_URL = "http://localhost:7912"
@@ -76,10 +47,11 @@ SPOOLMAN_CONNECTION_MESSAGE = (
     "Check that Spoolman is running, then select Refresh."
 )
 
-# Requests/urllib3 reaches Python's targetless ``socket.__new__`` audit event,
-# while urllib may load IDNA codecs before Orca approves the URL. http.client
-# emits ``http.client.connect`` with the target host before either operation,
-# allowing Orca to persist the grant and suppress the nested audit events.
+# http.client emits ``http.client.connect`` with the target host before opening
+# its socket. Do not eagerly request access to Python's IDNA files: Linux
+# AppImage mount paths change between launches and such a path cannot be
+# remembered. Orca remains responsible for the target-bearing HTTP approval and
+# its nested runtime events.
 class _HttpResponse:
     def __init__(self, url: str, status_code: int, body: bytes):
         self.url = url
