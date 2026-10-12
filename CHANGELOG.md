@@ -2,6 +2,12 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.11] - 2026-10-12
+
+- Fixed the **Select all** and **Clear** controls in every Advanced field synchronization tab so they update the checkboxes in the complete active tab panel.
+- Added regression coverage for the field-group action scope and validated Python syntax for all five stable packages.
+- Added stable packages for Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon.
+
 ## [2.2.10] - 2026-10-06
 
 - Added debounced Orca lifecycle-event integration from issue #10 so supported filament-preset and project events refresh PipSpool without performing network or UI work inside Orca's callback thread.

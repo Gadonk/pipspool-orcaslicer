@@ -138,7 +138,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.10 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.11 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. Lifecycle-aware refreshes activate automatically when
 Orca exposes that API; manual synchronization and the compatibility checks
 remain available on older plugin builds. The previous 2.2.9 stable behavior was
