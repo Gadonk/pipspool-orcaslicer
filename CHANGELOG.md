@@ -2,6 +2,17 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.12] - 2026-10-18
+
+- Aligned PipSpool with the public OrcaSlicer 2.5.0 Alpha plugin contract.
+- Declared OrcaSlicer's bundled Python 3.12 runtime in the PEP 723 plugin metadata.
+- Added recoverable handling for Orca 2.5's audited background-thread permission when synchronizing, resetting filament fields, using dashboard actions or testing the Spoolman connection.
+- Prevented a deferred lifecycle worker permission from leaking an unhandled `PermissionError`; PipSpool skips that single refresh and retries normally on the next event.
+- Retained compatibility guards for older Orca builds and did not bypass Orca's permission storage.
+- Kept the recurring targetless `socket.__new__` prompt documented as upstream OrcaSlicer issue #15724.
+- Validated 117 synchronization, dashboard, lifecycle, persistence, packaging and architecture tests.
+- Added stable packages for Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon.
+
 ## [2.2.11] - 2026-10-12
 
 - Fixed the **Select all** and **Clear** controls in every Advanced field synchronization tab so they update the checkboxes in the complete active tab panel.

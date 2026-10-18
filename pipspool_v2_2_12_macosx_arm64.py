@@ -1,10 +1,11 @@
 # /// script
+# requires-python = ">=3.12"
 # dependencies = []
 # [tool.orcaslicer.plugin]
 # name = "PipSpool"
 # description = "Spoolman synchronization plugin for OrcaSlicer"
 # author = "Donko"
-# version = "2.2.11"
+# version = "2.2.12"
 # ///
 
 """PipSpool: synchronize Spoolman inventory into OrcaSlicer presets.
@@ -35,7 +36,8 @@ import orca
 # Public default. Configure the Spoolman server address in PipSpool Settings.
 DEFAULT_SPOOLMAN_URL = "http://localhost:7912"
 DEFAULT_LOW_STOCK_THRESHOLD_GRAMS = 100.0
-PLUGIN_VERSION = "2.2.11"
+PLUGIN_VERSION = "2.2.12"
+ORCA_PLUGIN_API_BASELINE = "2.5.0-alpha"
 COPYRIGHT_YEAR = 2026
 FEEDBACK_URL = "https://github.com/Gadonk/pipspool-orcaslicer/issues"
 LATEST_RELEASE_API = "https://api.github.com/repos/Gadonk/pipspool-orcaslicer/releases/latest"
@@ -45,6 +47,10 @@ LOG_FILENAME = "pipspool.log"
 SPOOLMAN_CONNECTION_MESSAGE = (
     "Connection to the Spoolman server was lost or could not be established. "
     "Check that Spoolman is running, then select Refresh."
+)
+THREAD_PERMISSION_RETRY_MESSAGE = (
+    "OrcaSlicer did not allow PipSpool to create a background worker. "
+    "Approve the thread permission request, then repeat the action."
 )
 
 # http.client emits ``http.client.connect`` with the target host before opening
@@ -1823,6 +1829,39 @@ def show_message(message: str, title: str = "PipSpool", icon: str = "info") -> N
     orca.host.ui.message(message, title=title, icon=icon)
 
 
+def orca_runtime_description() -> str:
+    """Describe Orca when its 2.5 host-info API is available."""
+    try:
+        app_info = getattr(orca.host, "app_info", None)
+        info = app_info() if callable(app_info) else None
+        if not isinstance(info, dict):
+            return ""
+        version = str(info.get("version") or "").strip()
+        build = str(info.get("build") or "").strip()
+        if version and build and build not in version:
+            return f"{version} ({build})"
+        return version or build
+    except Exception as exc:
+        # app_info() is absent on older supported Orca builds and may only be
+        # called from Orca's UI thread. Compatibility must not depend on it.
+        log(f"[ORCA RUNTIME INFO] {exc}")
+        return ""
+
+
+def start_background_thread(thread: threading.Thread, operation: str) -> bool:
+    """Start work through Orca 2.5's audited thread-permission boundary."""
+    try:
+        thread.start()
+        return True
+    except PermissionError as exc:
+        # Orca 2.5 Alpha denies the current start when a permission prompt was
+        # queued from a non-UI lifecycle callback. If the user approves it, a
+        # later attempt succeeds. Keep the denied attempt recoverable and never
+        # try to bypass or pre-seed Orca's permission store.
+        log(f"[THREAD PERMISSION] {operation}: {exc}")
+        return False
+
+
 LIFECYCLE_DEBOUNCE_SECONDS = 1.0
 LIFECYCLE_SUPPORTED = getattr(orca, "LifecycleEvent", None) is not None
 
@@ -1936,7 +1975,11 @@ class LifecycleCoordinator:
             timer = threading.Timer(LIFECYCLE_DEBOUNCE_SECONDS, self._dispatch)
             timer.daemon = True
             self._timer = timer
-            timer.start()
+            if not start_background_thread(timer, "lifecycle refresh"):
+                # The permission prompt is already queued by Orca. Skip this
+                # one refresh instead of leaking PermissionError through the
+                # lifecycle trampoline; the next event will retry normally.
+                self._timer = None
 
     def _dispatch(self) -> None:
         with self._lock:
@@ -2146,7 +2189,12 @@ class SyncCapability(orca.script.ScriptPluginCapabilityBase):
 
     def on_load(self):
         mode = "enabled" if LIFECYCLE_SUPPORTED else "compatibility fallback"
-        log(f"[LIFECYCLE] Orca lifecycle integration {mode}")
+        runtime = orca_runtime_description()
+        runtime_detail = f"; runtime {runtime}" if runtime else ""
+        log(
+            f"[LIFECYCLE] Orca lifecycle integration {mode}; "
+            f"API baseline {ORCA_PLUGIN_API_BASELINE}{runtime_detail}"
+        )
 
     def on_unload(self):
         LIFECYCLE_COORDINATOR.shutdown()
@@ -2192,7 +2240,14 @@ class SyncCapability(orca.script.ScriptPluginCapabilityBase):
                 log(f"[SYNC ERROR] {exc}")
                 show_message(f"Synchronization failed:\n{exc}", icon="error")
 
-        threading.Thread(target=work, daemon=True).start()
+        if not start_background_thread(
+            threading.Thread(target=work, daemon=True),
+            "Spoolman synchronization",
+        ):
+            return orca.ExecutionResult.failure(
+                orca.PluginResult.RecoverableError,
+                THREAD_PERMISSION_RETRY_MESSAGE,
+            )
         return orca.ExecutionResult.success("PipSpool synchronization started")
 
 
@@ -2237,7 +2292,14 @@ class ResetFilamentSettingsCapability(orca.script.ScriptPluginCapabilityBase):
                 log(f"[FILAMENT RESET ERROR] {exc}")
                 show_message(f"Filament setting reset failed:\n{exc}", icon="error")
 
-        threading.Thread(target=work, daemon=True).start()
+        if not start_background_thread(
+            threading.Thread(target=work, daemon=True),
+            "filament setting reset",
+        ):
+            return orca.ExecutionResult.failure(
+                orca.PluginResult.RecoverableError,
+                THREAD_PERMISSION_RETRY_MESSAGE,
+            )
         return orca.ExecutionResult.success("PipSpool filament setting reset started")
 
 
@@ -3313,7 +3375,14 @@ if PAGES_BASE is not None:
                 except Exception as exc:
                     log(f"[PAGE ERROR] {exc}")
                     self.post_message({"type": "error", "message": str(exc)})
-            threading.Thread(target=work, daemon=True).start()
+            if not start_background_thread(
+                threading.Thread(target=work, daemon=True),
+                "PipSpool page action",
+            ):
+                self.post_message({
+                    "type": "error",
+                    "message": THREAD_PERMISSION_RETRY_MESSAGE,
+                })
 
         def on_message(self, message):
             if not isinstance(message, dict):
@@ -3630,7 +3699,15 @@ document.addEventListener('DOMContentLoaded', function() {{ startSettingsBridge(
                             icon="error",
                         )
 
-                threading.Thread(target=test_connection, daemon=True).start()
+                if not start_background_thread(
+                    threading.Thread(target=test_connection, daemon=True),
+                    "Spoolman connection test",
+                ):
+                    show_message(
+                        THREAD_PERMISSION_RETRY_MESSAGE,
+                        title="Connection test",
+                        icon="error",
+                    )
                 return
             if action == "save":
                 try:

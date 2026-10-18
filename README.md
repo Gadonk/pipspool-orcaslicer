@@ -138,12 +138,16 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.11 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
-and macOS Apple Silicon. Lifecycle-aware refreshes activate automatically when
-Orca exposes that API; manual synchronization and the compatibility checks
-remain available on older plugin builds. The previous 2.2.9 stable behavior was
-confirmed on OrcaSlicer 2.5.0 nightly build `4deadc9d` on Windows x86-64 with
-Spoolman, Klipper, Moonraker and Happy Hare.
+PipSpool 2.2.12 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+and macOS Apple Silicon. It is aligned with the public OrcaSlicer 2.5.0 Alpha
+Python-plugin metadata, lifecycle-event, hosted-page and background-worker APIs.
+Compatibility guards keep manual synchronization and the established fallback
+behavior available on older Orca plugin builds.
+
+OrcaSlicer 2.5 may ask once for permission when PipSpool creates a background
+worker. If permission is denied, PipSpool now reports a recoverable message:
+approve the request and repeat the action. PipSpool never edits or bypasses
+OrcaSlicer's saved permission decisions.
 
 Linux/WebKit Settings-window reload recovery requires an Orca build containing
 [OrcaSlicer PR #15737](https://github.com/OrcaSlicer/OrcaSlicer/pull/15737).
