@@ -2,6 +2,18 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.13] - 2026-10-20
+
+- Added a per-spool **Sync** action. When advanced fields are selected, the action reconciles the selected spool's shared-Filament group with existing sibling conflict protection; unrelated Filaments and archived-profile cleanup remain outside its scope.
+- Added configurable profile naming for issue #15, with a live example, reset control and durable saved preferences. The default remains `(#42) PETG Galaxy Black - Prusament - PipSpool`.
+- Kept one mandatory spool-ID marker and the managed suffix, prevented descriptive text from introducing another identity, and strengthened managed-profile lookup and safe rename/collision handling.
+- Preserved unrelated Orca settings during profile renames; the new naming format is applied only during synchronization.
+- Distinguished denied network operations from an offline Spoolman server, with recoverable approval-and-retry guidance.
+- Stopped full and per-spool synchronization before profile writes when field setup or shared-Filament reconciliation is denied, without automatically replaying mutating network requests.
+- Documented Orca's upstream permission fix #16658 (`6626377`), included in nightly `069bd402`. The original Orca 2.5.0 Alpha predates the fix; upgrading PipSpool alone does not resolve repeated prompts in older Orca builds.
+- Passed 117 regression tests and 26 focused tests, and validated all five packages for syntax, numeric stable metadata, matching contents and the localhost default.
+- Included Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon packages.
+
 ## [2.2.12] - 2026-10-18
 
 - Aligned PipSpool with the public OrcaSlicer 2.5.0 Alpha plugin contract.

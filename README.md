@@ -20,7 +20,8 @@ filament usage.
 - Lifecycle-aware refreshes after supported Orca preset and project events, with
   a compatibility path for older Orca builds.
 - Automatic removal of the matching profile when a spool is archived.
-- Sortable names such as `(#42) PLA Galaxy Blue - Manufacturer - PipSpool`.
+- Configurable profile naming, with `(#42) PLA Galaxy Blue - Manufacturer - PipSpool`
+  retained as the default and a mandatory spool ID for safe matching.
 - Nozzle and bed temperatures imported from the correct Spoolman material.
 - Managed `SET_ACTIVE_SPOOL ID=42` or optional per-spool custom Start G-code, with
   a visible dashboard toggle for printers and firmware that do not support the command.
@@ -54,7 +55,8 @@ one place:
   spools.
 - Colour-aware **Printer Gates/Toolheads** overview using assignments already
   reported by Spoolman.
-- **Feedback**, **Refresh** and **Synchronize now** actions.
+- **Feedback**, **Refresh** and **Synchronize now** actions, plus a **Sync**
+  button beside each active spool.
 - A prominent **Active spool G-code** toggle that is enabled by default and removes
   only PipSpool-managed `SET_ACTIVE_SPOOL` commands when switched off.
 - A diagnostic pending-synchronization notice that identifies affected spools
@@ -108,11 +110,41 @@ PipSpool matches generated profiles by numeric Spoolman ID. Adding, editing or
 archiving a spool therefore updates the correct Orca profile instead of creating
 another copy.
 
-Generated profiles use this order:
+Generated profiles use this order by default:
 
 ```text
 (#spool) MATERIAL Filament name - Manufacturer - PipSpool
 ```
+
+### Synchronize one spool
+
+Select **Sync** beside an active spool. With no advanced fields selected, only
+that spool is synchronized. With advanced fields enabled, the confirmation
+explains that all active profiles sharing its Spoolman Filament are reconciled
+together, preserving sibling conflict protection. Unrelated Filaments are left
+unchanged. Use **Synchronize now** for the full inventory and archived-profile
+cleanup. The last synchronization report lists the checked scope and changes.
+
+### Choose your profile naming
+
+Open **PipSpool Settings → Profile naming** and reorder these placeholders:
+
+- `{spool_id}`: required exactly once; renders as `(#42)`.
+- `{material}`: the Spoolman material.
+- `{name}`: the filament name without a repeated leading material.
+- `{vendor}`: the manufacturer.
+
+The default format is `{spool_id} {material} {name} - {vendor}`. For example,
+`{vendor} - {material} {name} {spool_id}` gives
+`Prusament - PETG Galaxy Black (#42) - PipSpool`.
+
+A live example and **Reset to default** are available. PipSpool always appends
+` - PipSpool` and validates the format to keep spool identification unambiguous.
+Saving the setting does not rename profiles immediately: synchronize to apply it,
+then restart OrcaSlicer when prompted. Full synchronization applies the format
+to all active spools. Existing profiles are matched by spool ID and renamed while
+preserving unrelated Orca adjustments. Unreadable or mismatched existing files
+are preserved with a visible error instead of being overwritten.
 
 PipSpool preserves unrelated Orca-specific profile adjustments. Advanced-field
 synchronization remembers the last agreed value so it can identify which side
@@ -138,7 +170,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.12 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.13 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is aligned with the public OrcaSlicer 2.5.0 Alpha
 Python-plugin metadata, lifecycle-event, hosted-page and background-worker APIs.
 Compatibility guards keep manual synchronization and the established fallback
@@ -153,15 +185,26 @@ Linux/WebKit Settings-window reload recovery requires an Orca build containing
 [OrcaSlicer PR #15737](https://github.com/OrcaSlicer/OrcaSlicer/pull/15737).
 PipSpool does not eagerly request access to installation-specific Python IDNA
 files at startup; this avoids an unstable Linux AppImage permission target.
-The recurring `socket.__new__` permission prompt is an open Orca issue tracked
-in [OrcaSlicer issue #15724](https://github.com/OrcaSlicer/OrcaSlicer/issues/15724);
-PipSpool does not bypass or conceal that security request.
+Orca fixed the recurring network permission prompt across restarts in
+[PR #16658](https://github.com/OrcaSlicer/OrcaSlicer/pull/16658), merged as
+`6626377` on 20 October 2026. Use an Orca build containing that fix; nightly
+`069bd402` includes it, while the original 2.5.0 Alpha release predates it.
+PipSpool alone cannot fix the host permission system in older Orca builds.
+
+PipSpool distinguishes a denied network operation from a disconnected server.
+If Orca refuses an attempt while posting an approval prompt, approve the trusted
+request and repeat the action. Permission denial during field setup or shared
+Filament reconciliation stops synchronization before profile writes and does
+not save a new successful synchronization baseline. Requests that change data
+are never automatically replayed. A new plugin identity or a different host may
+legitimately require approval. PipSpool does not edit or bypass Orca's grants.
 
 OrcaSlicer's Python plugin API is new and may change in future builds.
 
 ## Privacy and release safety
 
-PipSpool connects only to the Spoolman address saved in its settings. The public
+PipSpool synchronizes with the Spoolman address saved in its settings. Its
+installed-version notice also checks the public GitHub release API. The public
 source defaults to `http://localhost:7912`; configure your actual server address
 during setup. GitHub Actions rejects private development addresses from release
 artifacts. Every platform package is also checked for valid Python syntax and

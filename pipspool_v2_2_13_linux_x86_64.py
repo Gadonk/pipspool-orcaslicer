@@ -5,7 +5,7 @@
 # name = "PipSpool"
 # description = "Spoolman synchronization plugin for OrcaSlicer"
 # author = "Donko"
-# version = "2.2.12"
+# version = "2.2.13"
 # ///
 
 """PipSpool: synchronize Spoolman inventory into OrcaSlicer presets.
@@ -36,7 +36,7 @@ import orca
 # Public default. Configure the Spoolman server address in PipSpool Settings.
 DEFAULT_SPOOLMAN_URL = "http://localhost:7912"
 DEFAULT_LOW_STOCK_THRESHOLD_GRAMS = 100.0
-PLUGIN_VERSION = "2.2.12"
+PLUGIN_VERSION = "2.2.13"
 ORCA_PLUGIN_API_BASELINE = "2.5.0-alpha"
 COPYRIGHT_YEAR = 2026
 FEEDBACK_URL = "https://github.com/Gadonk/pipspool-orcaslicer/issues"
@@ -53,11 +53,27 @@ THREAD_PERMISSION_RETRY_MESSAGE = (
     "Approve the thread permission request, then repeat the action."
 )
 
+ORCA_NETWORK_PERMISSION_FIX = "6626377abc177587c7e60da487d69d86b4cc7f62"
+NETWORK_PERMISSION_RETRY_MESSAGE = (
+    "OrcaSlicer did not grant access for this network operation. "
+    "If Orca shows a permission request, approve it only if you trust the target, "
+    "then repeat the action. If approved network prompts return after restarting "
+    "OrcaSlicer, use a build containing Orca PR #16658 (commit 6626377). "
+    "PipSpool cannot save or bypass Orca's permission decisions."
+)
+
+
+class NetworkPermissionError(PermissionError):
+    """A denied network operation, distinct from a disconnected Spoolman server."""
+
+
 # http.client emits ``http.client.connect`` with the target host before opening
 # its socket. Do not eagerly request access to Python's IDNA files: Linux
 # AppImage mount paths change between launches and such a path cannot be
 # remembered. Orca remains responsible for the target-bearing HTTP approval and
-# its nested runtime events.
+# its nested runtime events. PR #16658 records stdlib operation roots and
+# persistent event grants in Orca itself. Keep this stdlib call path; do not
+# synthesize audit events, modify permission files or automatically replay writes.
 class _HttpResponse:
     def __init__(self, url: str, status_code: int, body: bytes):
         self.url = url
@@ -112,6 +128,10 @@ class _HttpSession:
             connection.request(method.upper(), path, body=data, headers=request_headers)
             response = connection.getresponse()
             return _HttpResponse(url, int(response.status), response.read())
+        except PermissionError as exc:
+            # Keep raw audit details in the exception chain for diagnostics, not
+            # in the user-facing message (which must not expose credentials).
+            raise NetworkPermissionError(NETWORK_PERMISSION_RETRY_MESSAGE) from exc
         finally:
             connection.close()
 
@@ -397,7 +417,11 @@ PERSISTENT_DIR = ORCA_DATA_DIR / "pipspool"
 SETTINGS_PATH = PERSISTENT_DIR / SETTINGS_FILENAME
 PAGE_ICON_PATH = PERSISTENT_DIR / "pipspool_page_icon.svg"
 LOG_PATH = PERSISTENT_DIR / LOG_FILENAME
+DEFAULT_PROFILE_NAME_TEMPLATE = "{spool_id} {material} {name} - {vendor}"
+PROFILE_NAME_TOKENS = ("spool_id", "material", "name", "vendor")
+
 HOST_CONFIG_KEYS = (
+    "profile_name_template",
     "spoolman_url",
     "show_pipspool_page",
     "low_stock_threshold_grams",
@@ -585,8 +609,52 @@ def safe_filename(value: str) -> str:
 
 
 def spool_id_from_name(filename: str) -> int | None:
-    match = re.search(r"\(#(\d+)\)", filename)
-    return int(match.group(1)) if match else None
+    matches = re.findall(r"\(#(\d+)\)", filename)
+    return int(matches[0]) if len(matches) == 1 and int(matches[0]) > 0 else None
+
+
+def managed_spool_id_from_name(filename: str) -> int | None:
+    if not filename.endswith((PROFILE_SUFFIX, " - Spoolman.json")):
+        return None
+    return spool_id_from_name(filename)
+
+
+def validate_profile_name_template(value: Any) -> str:
+    if not isinstance(value, str) or not value.strip() or len(value) > 120:
+        raise ValueError("Profile naming must contain 1–120 characters")
+    if re.search(r"[\x00-\x1f]", value):
+        raise ValueError("Profile naming cannot contain control characters")
+    value = value.strip()
+    tokens = re.findall(r"\{([^{}]*)\}", value)
+    remainder = re.sub(r"\{[^{}]*\}", "", value)
+    if (tokens.count("spool_id") != 1 or any(token not in PROFILE_NAME_TOKENS for token in tokens)
+            or "{" in remainder or "}" in remainder or "(#" in remainder
+            or re.search(r'[\\/:*?"<>|\x00-\x1f]', value)):
+        raise ValueError("Use {spool_id} exactly once and only {material}, {name}, {vendor}; avoid filename characters and literal (# markers")
+    return value
+
+
+def profile_name_template(settings: dict[str, Any] | None = None) -> str:
+    try:
+        return validate_profile_name_template((settings if settings is not None else load_settings()).get(
+            "profile_name_template", DEFAULT_PROFILE_NAME_TEMPLATE))
+    except ValueError:
+        return DEFAULT_PROFILE_NAME_TEMPLATE
+
+
+def profile_display_name(spool_id: int, material: str, name: str, vendor: str,
+                         template: str | None = None) -> str:
+    template = validate_profile_name_template(template) if template is not None else profile_name_template()
+    def descriptive(value):
+        # A data field must never introduce another identity marker or a path.
+        return re.sub(r"\s+", " ", re.sub(r"[\x00-\x1f]", "", safe_filename(str(value))).replace("(#", "[#")).strip()
+    values = {"spool_id": f"(#{spool_id})", "material": descriptive(material),
+              "name": descriptive(name) if name else "", "vendor": descriptive(vendor)}
+    rendered = re.sub(r"\{([^{}]+)\}", lambda match: values[match.group(1)], template)
+    rendered = re.sub(r"\s+", " ", rendered).strip() + " - PipSpool"
+    if len((rendered + ".json").encode("utf-8")) > 240:
+        raise ValueError("Profile name is too long; shorten the naming format or filament details")
+    return rendered
 
 
 def decode_extra_value(value: Any) -> Any:
@@ -1086,8 +1154,10 @@ class OrcaProfiles:
     def preset_for_spool(self, spool_id: int) -> dict[str, Any]:
         for directory in self.user_filament_directories():
             for path in directory.glob("*.json"):
-                if spool_id_from_name(path.name) == int(spool_id):
-                    return read_json(path)
+                if managed_spool_id_from_name(path.name) == int(spool_id):
+                    preset = read_json(path)
+                    if managed_spool_id_from_name(str(preset.get("name", "")) + ".json") == int(spool_id):
+                        return preset
         return {}
 
     def inherited_start_gcode(self, preset: dict[str, Any]) -> Any:
@@ -1295,7 +1365,7 @@ def desired_preset(
     material_prefix = re.compile(rf"^{re.escape(material)}(?:\s+|$)", re.IGNORECASE)
     filament_detail = material_prefix.sub("", filament_name, count=1).strip()
     material_and_name = f"{material} {filament_detail}".strip()
-    display_name = f"(#{spool_id}) {material_and_name} - {vendor} - PipSpool"
+    display_name = profile_display_name(spool_id, material, filament_detail, vendor)
 
     preset = dict(existing)
     dependency_values = {
@@ -1661,6 +1731,7 @@ def sync_profiles(
     selected_settings=ORCA_SETTINGS,
     change_directions: dict[str, set[int]] | None = None,
     inject_spool_id: bool = True,
+    cleanup_archived: bool = True,
 ) -> SyncReport:
     spools = [spool for spool in spools if not spool_is_archived(spool)]
     report = SyncReport(active_spools=len(spools))
@@ -1679,7 +1750,7 @@ def sync_profiles(
         directory.mkdir(parents=True, exist_ok=True)
         files_by_id: dict[int, list[Path]] = {}
         for path in directory.glob("*.json"):
-            spool_id = spool_id_from_name(path.name)
+            spool_id = managed_spool_id_from_name(path.name)
             if spool_id is not None and path.name.endswith((PROFILE_SUFFIX, " - Spoolman.json")):
                 files_by_id.setdefault(spool_id, []).append(path)
 
@@ -1689,10 +1760,14 @@ def sync_profiles(
                 candidates = sorted(files_by_id.get(spool_id, []))
                 source = candidates[0] if candidates else None
                 existing = read_json(source) if source else {}
+                if source is not None and (not existing or managed_spool_id_from_name(str(existing.get("name", "")) + ".json") != spool_id):
+                    raise ValueError(f"Unreadable existing profile: {source.name}; file preserved")
                 display_name, data = desired_preset(
                     spool, existing, profiles, selected_settings, inject_spool_id
                 )
                 target = directory / f"{safe_filename(display_name)}.json"
+                if target.exists() and (target not in candidates or managed_spool_id_from_name(str(read_json(target).get("name", "")) + ".json") != spool_id):
+                    raise ValueError(f"Profile name collision: {target.name}; existing file preserved")
 
                 if source is None:
                     write_json_atomic(target, data)
@@ -1741,7 +1816,7 @@ def sync_profiles(
                 report.errors.append(f"Spool {spool.get('id', '?')}: {exc}")
 
         for spool_id, paths in files_by_id.items():
-            if spool_id in active_ids:
+            if not cleanup_archived or spool_id in active_ids:
                 continue
             if not active_ids:
                 if not empty_inventory_warning_added:
@@ -2085,9 +2160,27 @@ load();
 </script></body></html>"""
 
 
+def synchronization_scope(spools, spool_id, selected_settings):
+    """Include siblings when reconciling shared fields; never treat a subset as inventory."""
+    if spool_id is None:
+        return spools
+    if isinstance(spool_id, bool) or not isinstance(spool_id, int) or spool_id <= 0:
+        raise ValueError("Spool ID must be a positive integer")
+    active = [spool for spool in spools if not spool_is_archived(spool)]
+    selected = next((spool for spool in active if int(spool["id"]) == spool_id), None)
+    if selected is None:
+        raise ValueError(f"Spool #{spool_id} is no longer active. Refresh the dashboard.")
+    filament_id = (selected.get("filament") or {}).get("id")
+    if not selected_settings or filament_id is None:
+        return [selected]
+    return [spool for spool in active
+            if str((spool.get("filament") or {}).get("id")) == str(filament_id)]
+
+
 def sync_with_spoolman(
     selected_settings: tuple[str, ...], remove_unselected: bool = False,
     live_preset_values: dict[str, dict[str, Any]] | None = None,
+    spool_id: int | None = None,
 ) -> tuple[SyncReport, list[dict[str, Any]]]:
     if live_preset_values is None:
         live_preset_values = host_filament_preset_snapshot(selected_settings)
@@ -2095,38 +2188,55 @@ def sync_with_spoolman(
     sync_state = settings.get("advanced_sync_state")
     if not isinstance(sync_state, dict):
         sync_state = {}
-    save_settings({"selected_fields": list(selected_settings)})
     client = SpoolmanClient(settings["spoolman_url"])
+    spools = client.active_spools()
+    scoped_spools = synchronization_scope(spools, spool_id, selected_settings)
+    if spool_id is not None and remove_unselected:
+        raise ValueError("Field cleanup requires full synchronization")
+    save_settings({"selected_fields": list(selected_settings)})
     field_warning = None
     try:
         client.ensure_start_gcode_field()
         client.ensure_orca_filament_fields(selected_settings)
         if remove_unselected:
             client.remove_unselected_orca_filament_fields(selected_settings)
+    except PermissionError:
+        # Approval can arrive after this worker has already been refused.
+        # A deliberate later retry starts from fresh inventory and sync state.
+        raise
     except Exception as exc:
         field_warning = f"Spoolman field setup: {exc}"
         log(f"[FIELD SETUP WARNING] {exc}")
-    spools = client.active_spools()
     profiles = orca_profiles()
     change_directions: dict[str, set[int]] = {}
     setting_conflicts: list[str] = []
     try:
         synchronize_filament_settings(
-            spools, profiles, client, selected_settings=selected_settings,
+            scoped_spools, profiles, client, selected_settings=selected_settings,
             live_preset_values=live_preset_values,
             sync_state=sync_state,
             change_directions=change_directions,
             conflict_messages=setting_conflicts,
         )
+    except PermissionError:
+        # Never write profiles from a partially reconciled shared Filament group.
+        raise
     except Exception as exc:
+        if spool_id is not None:
+            raise RuntimeError(f"Shared-Filament checks failed; profiles were preserved: {exc}") from exc
         warning = f"Filament setting sync: {exc}"
         field_warning = f"{field_warning}; {warning}" if field_warning else warning
         log(f"[FILAMENT SETTING WARNING] {exc}")
     report = sync_profiles(
-        spools, profiles, selected_settings,
+        scoped_spools, profiles, selected_settings,
         change_directions=change_directions,
         inject_spool_id=spool_id_gcode_enabled(settings),
+        cleanup_archived=spool_id is None,
     )
+    if spool_id is not None:
+        ids = ", ".join(f"#{int(spool['id'])}" for spool in scoped_spools)
+        add_report_change(report, f"Selected spool #{spool_id}; profiles checked: {ids}.")
+        add_report_change(report, "Shared advanced fields were checked across the related Filament group. Unrelated spools and archived profiles were left unchanged; use Synchronize now for inventory cleanup.")
     if field_warning:
         report.errors.insert(0, field_warning)
     if setting_conflicts:
@@ -2350,7 +2460,7 @@ def profile_sync_statuses(
         files_by_id: dict[int, list[Path]] = {}
         if directory.is_dir():
             for path in directory.glob("*.json"):
-                spool_id = spool_id_from_name(path.name)
+                spool_id = managed_spool_id_from_name(path.name)
                 if spool_id is not None and path.name.endswith(
                     (PROFILE_SUFFIX, " - Spoolman.json")
                 ):
@@ -2668,6 +2778,10 @@ def pipspool_page_state(notice=None, friendly_initial_error=False) -> dict[str, 
     try:
         spools = SpoolmanClient(settings["spoolman_url"]).active_spools()
         connected, detail = True, f"Found {len(spools)} active spool(s)."
+    except PermissionError as exc:
+        spools, connected = [], False
+        detail = NETWORK_PERMISSION_RETRY_MESSAGE
+        log(f"[PAGE NETWORK PERMISSION] {exc}")
     except Exception as exc:
         spools, connected = [], False
         detail = SPOOLMAN_CONNECTION_MESSAGE
@@ -2868,7 +2982,7 @@ def pipspool_page_html(initial_state=None) -> str:
         )
         spool_rows.append(
             "<tr>"
-            f'<td><button class="spool-link" data-open-spool="{escape(str(spool.get("id", "")), quote=True)}" title="Open this spool in Spoolman">#{escape(str(spool.get("id", "")))} ↗</button></td>'
+            f'<td><button class="spool-link" data-open-spool="{escape(str(spool.get("id", "")), quote=True)}" title="Open this spool in Spoolman">#{escape(str(spool.get("id", "")))} ↗</button> <button data-sync-spool="{escape(str(spool.get("id", "")), quote=True)}" title="Synchronize this spool and its shared Filament group">Sync</button></td>'
             f"<td>{escape(str(spool.get('material') or ''))}</td>"
             f'<td data-column="filament">{escape(str(spool.get("name") or ""))}</td>'
             f'<td data-column="manufacturer">{escape(str(spool.get("vendor") or ""))}</td>'
@@ -3012,6 +3126,8 @@ function send(action,extra){{
 }}
 function setBusy(value){{
   state.busy=value;
+  var rows=document.querySelectorAll('[data-sync-spool]');
+  for(var rowIndex=0;rowIndex<rows.length;rowIndex++)rows[rowIndex].disabled=value;
   var ids=['sync','refresh','saveFields','cleanup'];
   var i;
   for(i=0;i<ids.length;i++)byId(ids[i]).disabled=value;
@@ -3101,6 +3217,7 @@ function renderSpools(){{
       if(columns[j])cell.setAttribute('data-column',columns[j]);
       if(j===0){{
         var spoolLink=document.createElement('button');spoolLink.className='spool-link';spoolLink.setAttribute('data-open-spool',spool.id);spoolLink.title='Open this spool in Spoolman';spoolLink.textContent='#'+spool.id+' ↗';cell.appendChild(spoolLink);
+        var syncButton=document.createElement('button');syncButton.setAttribute('data-sync-spool',spool.id);syncButton.textContent='Sync';syncButton.title='Synchronize this spool and its shared Filament group';syncButton.disabled=state.busy;cell.appendChild(syncButton);
       }}else if(j===4){{
         var swatch=document.createElement('span');
         swatch.className='swatch';
@@ -3273,6 +3390,12 @@ byId('sortDirection').onclick=function(){{
 }};
 byId('spools').onclick=function(event){{
   var target=event.target;
+  if(target&&target.getAttribute&&target.getAttribute('data-sync-spool')){{
+    if(state.busy)return;
+    var spoolId=Number(target.getAttribute('data-sync-spool'));
+    if(window.confirm('Synchronize spool #'+spoolId+'? With advanced fields enabled, all profiles sharing its Spoolman Filament are reconciled too. Unrelated spools and archived profiles are unchanged.')){{setBusy(true);send('sync-spool',{{spool_id:spoolId,selected_fields:selectedFields()}});}}
+    return;
+  }}
   if(target&&target.getAttribute&&target.getAttribute('data-open-spool'))send('open-spool',{{spool_id:target.getAttribute('data-open-spool')}});
 }};
 var tableColumnInputs=document.querySelectorAll('[data-table-column]');
@@ -3449,15 +3572,20 @@ if PAGES_BASE is not None:
                     "Active spool G-code disabled. Synchronize to remove PipSpool's managed command."
                 )
                 self._post_state("state", notice)
-            elif action == "sync":
+            elif action in ("sync", "sync-spool"):
                 selected, _remove = parse_field_config({"selected_fields": message.get("selected_fields", [])})
                 live_preset_values = host_filament_preset_snapshot(selected)
+                target_spool_id = message.get("spool_id") if action == "sync-spool" else None
+                if action == "sync-spool" and (isinstance(target_spool_id, bool) or not isinstance(target_spool_id, int) or target_spool_id <= 0):
+                    self.post_message({"type": "error", "message": "Invalid spool ID"})
+                    return
                 def synchronize():
                     report, _spools = sync_with_spoolman(
-                        selected, live_preset_values=live_preset_values
+                        selected, live_preset_values=live_preset_values,
+                        spool_id=target_spool_id,
                     )
-                    suffix = " Restart OrcaSlicer to load changed presets." if report.changed else ""
-                    return "Synchronization completed." + suffix
+                    suffix = " Restart OrcaSlicer to load changed presets." if report.restart_required else ""
+                    return ("Synchronization completed with errors. Review Last synchronization." if report.errors else "Synchronization completed.") + suffix
                 self._background(synchronize)
             elif action == "cleanup":
                 def cleanup():
@@ -3474,6 +3602,7 @@ def settings_window_state() -> dict[str, Any]:
     lifecycle = LIFECYCLE_COORDINATOR.diagnostics()
     return {
         "type": "settings-state",
+        "profile_name_template": profile_name_template(settings),
         "spoolman_url": settings.get("spoolman_url", DEFAULT_SPOOLMAN_URL),
         "show_pipspool_page": settings.get("show_pipspool_page", True) is not False,
         "low_stock_threshold_grams": low_stock_threshold(settings),
@@ -3497,6 +3626,8 @@ class SettingsCapability(orca.script.ScriptPluginCapabilityBase):
             if not isinstance(stored, dict):
                 return False
             restored: dict[str, Any] = {}
+            if "profile_name_template" in stored:
+                restored["profile_name_template"] = profile_name_template(stored)
             if "spoolman_url" in stored:
                 restored["spoolman_url"] = normalize_url(stored["spoolman_url"])
             if isinstance(stored.get("show_pipspool_page"), bool):
@@ -3562,6 +3693,7 @@ class SettingsCapability(orca.script.ScriptPluginCapabilityBase):
         current_low_stock_threshold = low_stock_threshold(current_settings)
         safe_current_url = escape(str(current_url), quote=True)
         safe_default_url = escape(DEFAULT_SPOOLMAN_URL, quote=True)
+        safe_name_template = escape(profile_name_template(current_settings), quote=True)
         show_page_checked = " checked" if show_page else ""
         safe_low_stock_threshold = escape(f"{current_low_stock_threshold:g}", quote=True)
         html = f"""<!doctype html>
@@ -3607,11 +3739,24 @@ button:hover {{ background:rgba(255,255,255,.06); }}
 <input id="url" type="url" spellcheck="false" autocomplete="off"
  value="{safe_current_url}" placeholder="{safe_default_url}">
 <div class="example">Include http:// or https:// and the port, if one is used.</div></div>
+<div class="card display-card"><p class="card-title">Profile naming</p>
+<label for="profileNameTemplate">Name format</label>
+<input id="profileNameTemplate" value="{safe_name_template}" maxlength="120" spellcheck="false">
+<div class="example">Reorder {{spool_id}}, {{material}}, {{name}} and {{vendor}}. {{spool_id}} is required exactly once and includes (#42). The suffix “ - PipSpool” is always added.</div>
+<div id="namePreview" class="example"></div>
+<button type="button" id="resetNameTemplate">Reset to default</button>
+<div class="example">Saving does not rename profiles. Synchronize to apply; restart OrcaSlicer after profiles are renamed. Full synchronization applies the format to all active spools.</div></div>
 <div class="card sync-card"><p class="card-title">Filament setting ownership</p>
 <p class="help">Orca supplies the initial values selected from its filament-setting tabs.
 Blank Spoolman fields inherit from Orca; populated fields are preserved as overrides.</p>
 <div class="example">Use “Reset Spoolman Filament Settings from Orca” only when you
 want to replace all PipSpool-managed overrides for active filaments.</div></div>
+<div class="card sync-card"><p class="card-title">Network permissions</p>
+<p class="help">OrcaSlicer manages approval for the configured Spoolman server.
+After approving a request, repeat the action if Orca refused the current attempt.</p>
+<div class="example">If approved prompts return after restarting OrcaSlicer, use
+an Orca build containing permission fix #16658 (commit 6626377). The original
+2.5.0 Alpha predates this fix. A different host may require its own approval.</div></div>
 <div class="card sync-card"><p class="card-title">Orca change detection</p>
 <p class="help">New Orca builds notify PipSpool when filament presets are saved.
 Older Orca versions continue to use PipSpool's compatibility checks.</p>
@@ -3630,12 +3775,21 @@ Older Orca versions continue to use PipSpool's compatibility checks.</p>
 <div class="right"><button onclick="send('cancel')">Cancel</button>
 <button class="primary" onclick="send('save')">Save settings</button></div></div>
 <script>
+var nameTemplate = document.getElementById('profileNameTemplate');
+function previewName() {{
+  var values={{spool_id:'(#42)',material:'PETG',name:'Galaxy Black',vendor:'Prusament'}};
+  var text=nameTemplate.value.replace(/\\{{([^{{}}]+)\\}}/g,function(all,key){{return Object.prototype.hasOwnProperty.call(values,key)?values[key]:all;}});
+  document.getElementById('namePreview').textContent='Example: '+text.replace(/\\s+/g,' ').trim()+' - PipSpool';
+}}
+nameTemplate.oninput=previewName;
+document.getElementById('resetNameTemplate').onclick=function(){{nameTemplate.value={json.dumps(DEFAULT_PROFILE_NAME_TEMPLATE)};previewName();}};
+previewName();
 var url = document.getElementById('url');
 var showPage = document.getElementById('showPage');
 var lowStockThreshold = document.getElementById('lowStockThreshold');
 var lifecycleStatus = document.getElementById('lifecycleStatus');
 function settingsPayload(action) {{
-  return {{action:action,url:url.value,show_pipspool_page:showPage.checked,low_stock_threshold_grams:lowStockThreshold.value}};
+  return {{action:action,profile_name_template:nameTemplate.value,url:url.value,show_pipspool_page:showPage.checked,low_stock_threshold_grams:lowStockThreshold.value}};
 }}
 function send(action) {{
   if(window.orca&&typeof window.orca.postMessage==='function')window.orca.postMessage(settingsPayload(action));
@@ -3643,6 +3797,7 @@ function send(action) {{
 }}
 function applySettingsState(data) {{
   if(!data||data.type!=='settings-state')return;
+  nameTemplate.value=data.profile_name_template||{json.dumps(DEFAULT_PROFILE_NAME_TEMPLATE)};previewName();
   url.value=data.spoolman_url||{json.dumps(DEFAULT_SPOOLMAN_URL)};
   showPage.checked=data.show_pipspool_page!==false;
   lowStockThreshold.value=data.low_stock_threshold_grams==null?{DEFAULT_LOW_STOCK_THRESHOLD_GRAMS}:data.low_stock_threshold_grams;
@@ -3721,7 +3876,10 @@ document.addEventListener('DOMContentLoaded', function() {{ startSettingsBridge(
                     )
                     if updated_low_stock_threshold is None or updated_low_stock_threshold < 0:
                         raise ValueError("Low-stock warning threshold must be 0 grams or more")
+                    updated_name_template = validate_profile_name_template(data.get("profile_name_template", profile_name_template()))
+                    naming_changed = updated_name_template != profile_name_template()
                     settings_update = {
+                        "profile_name_template": updated_name_template,
                         "spoolman_url": normalize_url(data.get("url", "")),
                         "show_pipspool_page": updated_show_page,
                         "low_stock_threshold_grams": round(updated_low_stock_threshold, 1),
@@ -3737,6 +3895,8 @@ document.addEventListener('DOMContentLoaded', function() {{ startSettingsBridge(
                         raise RuntimeError("OrcaSlicer could not save PipSpool settings")
                     window.close()
                     message = "PipSpool settings saved."
+                    if naming_changed:
+                        message += "\n\nSynchronize to apply profile naming. Restart OrcaSlicer after profiles are renamed."
                     if visibility_changed:
                         message += "\n\nRestart OrcaSlicer to apply the page visibility change."
                     show_message(message)
