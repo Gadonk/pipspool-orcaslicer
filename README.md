@@ -23,8 +23,9 @@ filament usage.
 - Configurable profile naming, with `(#42) PLA Galaxy Blue - Manufacturer - PipSpool`
   retained as the default and a mandatory spool ID for safe matching.
 - Nozzle and bed temperatures imported from the correct Spoolman material.
-- Managed `SET_ACTIVE_SPOOL ID=42` or optional per-spool custom Start G-code, with
-  a visible dashboard toggle for printers and firmware that do not support the command.
+- Configurable spool-ID command with `{spool_id}` substitution, retaining
+  `SET_ACTIVE_SPOOL ID={spool_id}` as the default, optional per-spool Start G-code,
+  and the existing dashboard off switch.
 - Optional synchronization for selected fields across every Orca filament tab.
 - Bidirectional advanced-field updates: one-sided Spoolman changes can update
   Orca, while Orca remains master if both sides changed differently.
@@ -58,7 +59,7 @@ one place:
 - **Feedback**, **Refresh** and **Synchronize now** actions, plus a **Sync**
   button beside each active spool.
 - A prominent **Active spool G-code** toggle that is enabled by default and removes
-  only PipSpool-managed `SET_ACTIVE_SPOOL` commands when switched off.
+  PipSpool-managed spool-ID output, including the configured command, when switched off.
 - A diagnostic pending-synchronization notice that identifies affected spools
   and changed fields, kept separate from the restart-required notice.
 - Last synchronization metrics, report and visible errors.
@@ -125,6 +126,48 @@ together, preserving sibling conflict protection. Unrelated Filaments are left
 unchanged. Use **Synchronize now** for the full inventory and archived-profile
 cleanup. The last synchronization report lists the checked scope and changes.
 
+### Choose the spool-ID command
+
+Open **PipSpool Settings → Active spool G-code**. The default template is:
+
+```gcode
+SET_ACTIVE_SPOOL ID={spool_id}
+```
+
+PipSpool replaces `{spool_id}` with the physical Spoolman spool number when it
+writes the filament profile. Spool #42 therefore gets `SET_ACTIVE_SPOOL ID=42`.
+The template must be a single line containing `{spool_id}` exactly once. The
+Settings example preview and **Reset command to default** help you check it.
+The command is saved through Orca's capability configuration and the existing
+settings-file mirror.
+
+The right command depends on installed firmware and macros, not the printer
+brand alone. The same examples are available beside the setting:
+
+| Printer / firmware setup | Command or setting | Requirement |
+| --- | --- | --- |
+| Klipper + Moonraker + Spoolman | `SET_ACTIVE_SPOOL ID={spool_id}` | Install the macro from [Moonraker's Spoolman setup](https://moonraker.readthedocs.io/en/stable/configuration/#setting-the-active-spool-from-klipper). |
+| Anycubic GoKlipper with an M555 Spoolman bridge | `M555 S={spool_id}` | Reported in issue #16; use only if your firmware or macro implements it. This is not a universal Anycubic command. |
+| Klipper with a custom SET_SPOOL_ID macro | `SET_SPOOL_ID ID={spool_id}` | Your printer must define that macro with an ID parameter. This is not Moonraker's documented default. |
+| Happy Hare / MMU managing active-spool selection | Turn **Active spool G-code** off | Use this when the configured MMU integration already selects the correct active Spoolman spool on tool changes. |
+| Printer without a compatible Spoolman command | Turn **Active spool G-code** off | Continue using the printer's own filament-selection workflow; profile synchronization remains available. |
+
+Per-spool Spoolman `start_gcode` remains an explicit override of the automatic
+command and now supports literal `{spool_id}` replacement too. Other Orca or
+Klipper expressions in that custom text are preserved, not evaluated by PipSpool.
+
+The dashboard **Active spool G-code** switch still disables managed spool-ID
+output. During synchronization PipSpool removes the managed block, filters the
+configured/standard spool commands and token-bearing lines from its custom
+managed text, and preserves unrelated user-authored Start G-code. Saving a new
+command does not turn the switch back on. Advanced/shared Start G-code cannot
+restore another spool's managed ID or defeat the off switch.
+
+After saving or toggling, synchronize the affected profiles and restart
+OrcaSlicer when prompted. Use full synchronization to apply the change to all
+active profiles. Changing this setting does not execute a command on the printer
+or configure the printer's macros.
+
 ### Choose your profile naming
 
 Open **PipSpool Settings → Profile naming** and reorder these placeholders:
@@ -170,7 +213,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.13 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.14 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is aligned with the public OrcaSlicer 2.5.0 Alpha
 Python-plugin metadata, lifecycle-event, hosted-page and background-worker APIs.
 Compatibility guards keep manual synchronization and the established fallback

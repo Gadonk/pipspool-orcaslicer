@@ -5,7 +5,7 @@
 # name = "PipSpool"
 # description = "Spoolman synchronization plugin for OrcaSlicer"
 # author = "Donko"
-# version = "2.2.13"
+# version = "2.2.14"
 # ///
 
 """PipSpool: synchronize Spoolman inventory into OrcaSlicer presets.
@@ -36,7 +36,7 @@ import orca
 # Public default. Configure the Spoolman server address in PipSpool Settings.
 DEFAULT_SPOOLMAN_URL = "http://localhost:7912"
 DEFAULT_LOW_STOCK_THRESHOLD_GRAMS = 100.0
-PLUGIN_VERSION = "2.2.13"
+PLUGIN_VERSION = "2.2.14"
 ORCA_PLUGIN_API_BASELINE = "2.5.0-alpha"
 COPYRIGHT_YEAR = 2026
 FEEDBACK_URL = "https://github.com/Gadonk/pipspool-orcaslicer/issues"
@@ -417,10 +417,13 @@ PERSISTENT_DIR = ORCA_DATA_DIR / "pipspool"
 SETTINGS_PATH = PERSISTENT_DIR / SETTINGS_FILENAME
 PAGE_ICON_PATH = PERSISTENT_DIR / "pipspool_page_icon.svg"
 LOG_PATH = PERSISTENT_DIR / LOG_FILENAME
+DEFAULT_SPOOL_ID_COMMAND = "SET_ACTIVE_SPOOL ID={spool_id}"
+
 DEFAULT_PROFILE_NAME_TEMPLATE = "{spool_id} {material} {name} - {vendor}"
 PROFILE_NAME_TOKENS = ("spool_id", "material", "name", "vendor")
 
 HOST_CONFIG_KEYS = (
+    "spool_id_command_template",
     "profile_name_template",
     "spoolman_url",
     "show_pipspool_page",
@@ -672,11 +675,42 @@ def decode_extra_value(value: Any) -> Any:
     return decoded
 
 
+def validate_spool_id_command_template(value: Any) -> str:
+    if not isinstance(value, str) or not value.strip() or len(value) > 200:
+        raise ValueError("Spool-ID command must contain 1–200 characters")
+    if re.search(r"[\x00-\x1f\x7f]", value):
+        raise ValueError("Spool-ID command must be a single line without control characters")
+    value = value.strip()
+    remainder = value.replace("{spool_id}", "")
+    if (value.count("{spool_id}") != 1 or "{" in remainder or "}" in remainder
+            or "{spool_id}" not in value.split(";", 1)[0]
+            or not re.match(r"^[A-Za-z][A-Za-z0-9_]*\s+", value)):
+        raise ValueError("Use one command followed by parameters containing {spool_id} exactly once; no other placeholders are supported")
+    return value
+
+
+def spool_id_command_template(settings: dict[str, Any] | None = None) -> str:
+    try:
+        return validate_spool_id_command_template(
+            (settings if settings is not None else load_settings()).get(
+                "spool_id_command_template", DEFAULT_SPOOL_ID_COMMAND))
+    except ValueError:
+        return DEFAULT_SPOOL_ID_COMMAND
+
+
+def render_spool_id_command(spool_id: int, template: str | None = None) -> str:
+    if isinstance(spool_id, bool) or not isinstance(spool_id, int) or spool_id <= 0:
+        raise ValueError("Spool ID must be a positive integer")
+    template = spool_id_command_template() if template is None else validate_spool_id_command_template(template)
+    return template.replace("{spool_id}", str(spool_id))
+
+
 def managed_start_gcode(
     existing: Any,
     spool_id: int,
     custom_gcode: Any = None,
     inject_spool_id: bool = True,
+    command_template: str | None = None,
 ) -> list[str]:
     if isinstance(existing, list):
         text = str(existing[0]) if existing else ""
@@ -698,17 +732,22 @@ def managed_start_gcode(
     if custom_text is None:
         custom_text = ""
     custom_text = str(custom_text).strip()
+    template = spool_id_command_template() if command_template is None else validate_spool_id_command_template(command_template)
     if not inject_spool_id and custom_text:
+        command_name = template.split()[0]
         custom_text = "\n".join(
             line for line in custom_text.splitlines()
-            if not re.match(
-                rf"^\s*(?:{ACTIVE_SPOOL_GCODE}|{LEGACY_SPOOL_GCODE})(?:\s|$)",
+            if "{spool_id}" not in line and not re.match(
+                rf"^\s*(?:{ACTIVE_SPOOL_GCODE}|{LEGACY_SPOOL_GCODE}|{re.escape(command_name)})(?:\s|$)",
                 line,
                 re.IGNORECASE,
             )
         ).strip()
+    # Substitute only the literal token; retain other Orca/Klipper syntax.
+    if inject_spool_id:
+        custom_text = custom_text.replace("{spool_id}", str(int(spool_id)))
     managed_text = custom_text or (
-        f"{ACTIVE_SPOOL_GCODE} ID={int(spool_id)}" if inject_spool_id else ""
+        render_spool_id_command(spool_id, template) if inject_spool_id else ""
     )
     if not managed_text:
         return [preserved]
@@ -1393,12 +1432,6 @@ def desired_preset(
             "filament_vendor": [vendor],
             "filament_type": [material],
             "default_filament_colour": [f"#{color}"],
-            "filament_start_gcode": managed_start_gcode(
-                start_gcode,
-                spool_id,
-                spool_extras.get("start_gcode"),
-                inject_spool_id,
-            ),
         }
     )
 
@@ -1448,6 +1481,13 @@ def desired_preset(
             if key in reconciled_settings:
                 preset.pop(key, None)
         preset.update(decoded_orca_overrides(filament, reconciled_settings))
+
+    # Apply identity last so shared advanced Start G-code cannot restore another
+    # spool's managed ID or defeat the dashboard off switch.
+    preset["filament_start_gcode"] = managed_start_gcode(
+        preset.get("filament_start_gcode", start_gcode), spool_id,
+        spool_extras.get("start_gcode"), inject_spool_id,
+    )
 
     # Preserve restrictions unless the user explicitly selected that dependency
     # field for synchronization. Unselected compatibility remains Orca-owned.
@@ -3105,7 +3145,7 @@ table{{width:100%;border-collapse:separate;border-spacing:0}}th,td{{padding:9px 
 @media(max-width:1100px){{.connection-layout{{grid-template-columns:1fr}}.gate-panel{{padding:17px 0 0;border-left:0;border-top:1px solid var(--orca-border)}}.spool-id-control{{top:12px}}.gate-grid{{grid-template-columns:repeat(4,minmax(108px,1fr))}}}}@media(max-width:850px){{.grid{{grid-template-columns:1fr}}.top-actions{{margin-left:0}}header{{flex-wrap:wrap}}.gate-panel>p{{padding-right:0;margin-top:58px}}.spool-id-control{{left:0;right:auto}}.gate-grid{{grid-template-columns:repeat(2,minmax(108px,1fr))}}.spool-controls{{align-items:flex-start;flex-direction:column}}.sort-controls{{width:100%}}.sort-controls select{{flex:1}}}}
 </style></head><body class="pipspool-page"><main>
 <header><img class="logo" src="{PIPSPOOL_LOGO_DATA_URI}" alt="PipSpool"><div><h1>PipSpool</h1><p class="sub">Spoolman synchronization for OrcaSlicer</p></div><div class="top-actions"><button id="feedback">Feedback</button><button id="refresh">Refresh</button><button id="sync" class="primary">Synchronize now</button></div></header>
-<div class="grid"><div id="updateBanner" class="update-banner"{"" if initial_available_update else " hidden"}><span class="update-symbol">↑</span><span id="updateText">PipSpool {escape(str(initial_available_update or ''))} is available — open File → Plugins to update.</span></div><div id="syncBanner" class="sync-banner"{"" if initial_synchronization_required and not initial_restart_required else " hidden"}><span class="sync-symbol">⇄</span><span id="syncText">{escape(initial_sync_text)}</span></div><div id="restartBanner" class="restart-banner"{"" if initial_restart_required else " hidden"}><span class="restart-symbol">↻</span><span>Filament profiles changed — restart OrcaSlicer to load them.</span></div><section class="card wide"><div class="connection-layout"><div class="connection-side"><h2>Connection</h2><div class="status-line"><img id="statusPip" class="status-pip" src="{initial_pip}" alt="Pip connection status"><div class="status-copy"><b id="status">{initial_status}</b><p id="connectionDetail" class="muted">{initial_detail}</p><p class="muted">Server settings, can be found in the PipSpool plugin settings.</p></div></div></div><div id="loadoutCard" class="gate-panel"><h2>Printer Gates/Toolheads</h2><p class="muted">A quick view of the gate assignments reported by Spoolman.</p><label class="spool-id-control" title="Add Moonraker's SET_ACTIVE_SPOOL command to PipSpool filament profiles"><span class="spool-id-control-copy"><b>Active spool G-code</b><span id="spoolIdState">{"Enabled" if initial_spool_id_gcode else "Disabled"}</span></span><span class="switch"><input id="spoolIdGcode" type="checkbox"{" checked" if initial_spool_id_gcode else ""}><span class="switch-track"></span></span></label><div id="loadout" class="gate-grid">{loadout_cards_html}</div><p id="loadoutEmpty" class="muted"{" hidden" if loadout_cards_html else ""}>No active spools are assigned to a printer gate in Spoolman.</p></div></div></section>
+<div class="grid"><div id="updateBanner" class="update-banner"{"" if initial_available_update else " hidden"}><span class="update-symbol">↑</span><span id="updateText">PipSpool {escape(str(initial_available_update or ''))} is available — open File → Plugins to update.</span></div><div id="syncBanner" class="sync-banner"{"" if initial_synchronization_required and not initial_restart_required else " hidden"}><span class="sync-symbol">⇄</span><span id="syncText">{escape(initial_sync_text)}</span></div><div id="restartBanner" class="restart-banner"{"" if initial_restart_required else " hidden"}><span class="restart-symbol">↻</span><span>Filament profiles changed — restart OrcaSlicer to load them.</span></div><section class="card wide"><div class="connection-layout"><div class="connection-side"><h2>Connection</h2><div class="status-line"><img id="statusPip" class="status-pip" src="{initial_pip}" alt="Pip connection status"><div class="status-copy"><b id="status">{initial_status}</b><p id="connectionDetail" class="muted">{initial_detail}</p><p class="muted">Server settings, can be found in the PipSpool plugin settings.</p></div></div></div><div id="loadoutCard" class="gate-panel"><h2>Printer Gates/Toolheads</h2><p class="muted">A quick view of the gate assignments reported by Spoolman.</p><label class="spool-id-control" title="Enable or disable the configured spool-ID command; edit the command in PipSpool Settings"><span class="spool-id-control-copy"><b>Active spool G-code</b><span id="spoolIdState">{"Enabled" if initial_spool_id_gcode else "Disabled"}</span></span><span class="switch"><input id="spoolIdGcode" type="checkbox"{" checked" if initial_spool_id_gcode else ""}><span class="switch-track"></span></span></label><div id="loadout" class="gate-grid">{loadout_cards_html}</div><p id="loadoutEmpty" class="muted"{" hidden" if loadout_cards_html else ""}>No active spools are assigned to a printer gate in Spoolman.</p></div></div></section>
 <section class="card"><h2>Active spools</h2><div class="toolbar"><input id="search" type="search" placeholder="Search by spool number, material, colour, manufacturer, name, location, gate or profile status"><details class="columns-menu"><summary>Columns</summary><div class="column-choices">{''.join(f'<label><input type="checkbox" data-table-column="{column}"{" checked" if column in initial_table_columns else ""}>{SPOOL_TABLE_COLUMN_LABELS[column]}</label>' for column in SPOOL_TABLE_COLUMNS)}</div></details></div><div class="spool-controls"><div class="spool-filters" role="group" aria-label="Filter active spools"><button type="button" class="spool-filter active" data-spool-filter="all" aria-pressed="true">All<span class="filter-count" data-filter-count="all">0</span></button><button type="button" class="spool-filter" data-spool-filter="loaded" aria-pressed="false">Loaded<span class="filter-count" data-filter-count="loaded">0</span></button><button type="button" class="spool-filter" data-spool-filter="low" aria-pressed="false">Low filament<span class="filter-count" data-filter-count="low">0</span></button><button type="button" class="spool-filter" data-spool-filter="sync" aria-pressed="false">Needs synchronization<span class="filter-count" data-filter-count="sync">0</span></button><button type="button" class="spool-filter" data-spool-filter="problems" aria-pressed="false">Profile problems<span class="filter-count" data-filter-count="problems">0</span></button></div><div class="sort-controls"><label for="spoolSort">Sort by</label><select id="spoolSort"><option value="id">Spool number</option><option value="material">Material</option><option value="remaining">Remaining weight</option><option value="vendor">Manufacturer</option><option value="gate">Gate/toolhead</option></select><button id="sortDirection" class="sort-direction" type="button" title="Ascending order" aria-label="Ascending order">↑</button></div></div><div class="spool-wrap"><table><thead><tr><th>Spool</th><th>Material</th><th data-column="filament">Filament</th><th data-column="manufacturer">Manufacturer</th><th data-column="colour">Colour</th><th data-column="nozzle">Nozzle</th><th data-column="bed">Bed</th><th data-column="remaining">Remaining</th><th data-column="location">Location</th><th data-column="loaded">Gate/Toolhead</th><th data-column="sync">Profile status</th></tr></thead><tbody id="spools">{spool_rows_html}</tbody></table></div><p id="empty" class="muted"{" hidden" if initial_spools else ""}>No matching active spools.</p></section>
 <section class="card"><h2>Last synchronization</h2><div class="metrics"><div class="metric"><b id="active">{initial_active}</b><span>Active spools</span></div><div class="metric"><b id="changed">{initial_changed}</b><span>Changed spools</span></div><div class="metric"><b id="errors">{len(initial_errors) if isinstance(initial_report, dict) else '—'}</b><span>Errors</span></div></div><pre id="report" class="report">{escape(initial_report_text)}</pre></section>
 <section class="card wide"><h2>Advanced field synchronization</h2><p class="muted">Each physical spool has its own Orca profile. Selected Advanced values are stored on the shared Spoolman Filament, so changing one profile can update every profile using that Filament. Inventory belongs to the individual spool; ordinary filament temperatures still come from Spoolman.</p><nav class="field-tabs" role="tablist" aria-label="Orca filament setting sections">{''.join(field_tabs)}</nav><div class="field-workspace">{''.join(field_panels)}</div><div class="field-footer"><span id="selectionCount" class="muted">{len(selected_fields)} field{"" if len(selected_fields) == 1 else "s"} selected</span><button id="saveFields">Save field selection</button></div></section>
@@ -3603,6 +3643,7 @@ def settings_window_state() -> dict[str, Any]:
     return {
         "type": "settings-state",
         "profile_name_template": profile_name_template(settings),
+        "spool_id_command_template": spool_id_command_template(settings),
         "spoolman_url": settings.get("spoolman_url", DEFAULT_SPOOLMAN_URL),
         "show_pipspool_page": settings.get("show_pipspool_page", True) is not False,
         "low_stock_threshold_grams": low_stock_threshold(settings),
@@ -3626,6 +3667,8 @@ class SettingsCapability(orca.script.ScriptPluginCapabilityBase):
             if not isinstance(stored, dict):
                 return False
             restored: dict[str, Any] = {}
+            if "spool_id_command_template" in stored:
+                restored["spool_id_command_template"] = spool_id_command_template(stored)
             if "profile_name_template" in stored:
                 restored["profile_name_template"] = profile_name_template(stored)
             if "spoolman_url" in stored:
@@ -3694,6 +3737,7 @@ class SettingsCapability(orca.script.ScriptPluginCapabilityBase):
         safe_current_url = escape(str(current_url), quote=True)
         safe_default_url = escape(DEFAULT_SPOOLMAN_URL, quote=True)
         safe_name_template = escape(profile_name_template(current_settings), quote=True)
+        safe_spool_command = escape(spool_id_command_template(current_settings), quote=True)
         show_page_checked = " checked" if show_page else ""
         safe_low_stock_threshold = escape(f"{current_low_stock_threshold:g}", quote=True)
         html = f"""<!doctype html>
@@ -3746,6 +3790,27 @@ button:hover {{ background:rgba(255,255,255,.06); }}
 <div id="namePreview" class="example"></div>
 <button type="button" id="resetNameTemplate">Reset to default</button>
 <div class="example">Saving does not rename profiles. Synchronize to apply; restart OrcaSlicer after profiles are renamed. Full synchronization applies the format to all active spools.</div></div>
+<div class="card display-card"><p class="card-title">Active spool G-code</p>
+<label for="spoolIdCommand">Spool-ID command</label>
+<input id="spoolIdCommand" value="{safe_spool_command}" maxlength="200" spellcheck="false">
+<div class="example">Use {{spool_id}} exactly once. Default: SET_ACTIVE_SPOOL ID={{spool_id}}. Example alternative: M555 S={{spool_id}}.</div>
+<div id="spoolCommandPreview" class="example"></div>
+<details class="example" style="margin:12px 0"><summary style="cursor:pointer;font-weight:650">Printer / firmware command examples</summary>
+<p>The command depends on the installed firmware and macros, rather than the printer brand alone.</p>
+<dl style="margin:10px 0;line-height:1.65">
+<dt style="font-weight:650">Klipper + Moonraker + Spoolman</dt>
+<dd style="margin:2px 0 14px"><code>SET_ACTIVE_SPOOL ID={{spool_id}}</code><br>Default. Requires the SET_ACTIVE_SPOOL macro from Moonraker's Spoolman setup. Spool #42 produces <code>SET_ACTIVE_SPOOL ID=42</code>.</dd>
+<dt style="font-weight:650">Anycubic GoKlipper with an M555 Spoolman bridge</dt>
+<dd style="margin:2px 0 14px"><code>M555 S={{spool_id}}</code><br>Example reported for issue #16. Use only when your installed firmware or custom macro implements this command. Spool #42 produces <code>M555 S=42</code>; this is not a universal Anycubic command.</dd>
+<dt style="font-weight:650">Klipper with a custom SET_SPOOL_ID macro</dt>
+<dd style="margin:2px 0 14px"><code>SET_SPOOL_ID ID={{spool_id}}</code><br>Use only if you have defined this exact macro and its ID parameter. It is not Moonraker's documented default.</dd>
+<dt style="font-weight:650">Happy Hare / MMU managing the active spool</dt>
+<dd style="margin:2px 0 14px">Turn <b>Active spool G-code</b> off on the dashboard if your configured MMU integration already selects the correct active Spoolman spool on tool changes.</dd>
+<dt style="font-weight:650">Printer without a compatible Spoolman command</dt>
+<dd style="margin:2px 0 0">Turn <b>Active spool G-code</b> off. PipSpool still synchronizes profiles; use your printer's own filament-selection workflow.</dd>
+</dl></details>
+<button type="button" id="resetSpoolCommand">Reset command to default</button>
+<div class="example">The dashboard Active spool G-code switch turns managed spool-ID output off entirely. Unrelated Start G-code stays intact. Per-spool Spoolman start_gcode overrides this command and also accepts {{spool_id}}. Synchronize after saving, then restart OrcaSlicer when prompted.</div></div>
 <div class="card sync-card"><p class="card-title">Filament setting ownership</p>
 <p class="help">Orca supplies the initial values selected from its filament-setting tabs.
 Blank Spoolman fields inherit from Orca; populated fields are preserved as overrides.</p>
@@ -3775,6 +3840,13 @@ Older Orca versions continue to use PipSpool's compatibility checks.</p>
 <div class="right"><button onclick="send('cancel')">Cancel</button>
 <button class="primary" onclick="send('save')">Save settings</button></div></div>
 <script>
+var spoolCommand = document.getElementById('spoolIdCommand');
+function previewSpoolCommand() {{
+  document.getElementById('spoolCommandPreview').textContent='Example for spool #42: '+spoolCommand.value.split('{{spool_id}}').join('42');
+}}
+spoolCommand.oninput=previewSpoolCommand;
+document.getElementById('resetSpoolCommand').onclick=function(){{spoolCommand.value={json.dumps(DEFAULT_SPOOL_ID_COMMAND)};previewSpoolCommand();}};
+previewSpoolCommand();
 var nameTemplate = document.getElementById('profileNameTemplate');
 function previewName() {{
   var values={{spool_id:'(#42)',material:'PETG',name:'Galaxy Black',vendor:'Prusament'}};
@@ -3789,7 +3861,7 @@ var showPage = document.getElementById('showPage');
 var lowStockThreshold = document.getElementById('lowStockThreshold');
 var lifecycleStatus = document.getElementById('lifecycleStatus');
 function settingsPayload(action) {{
-  return {{action:action,profile_name_template:nameTemplate.value,url:url.value,show_pipspool_page:showPage.checked,low_stock_threshold_grams:lowStockThreshold.value}};
+  return {{action:action,spool_id_command_template:spoolCommand.value,profile_name_template:nameTemplate.value,url:url.value,show_pipspool_page:showPage.checked,low_stock_threshold_grams:lowStockThreshold.value}};
 }}
 function send(action) {{
   if(window.orca&&typeof window.orca.postMessage==='function')window.orca.postMessage(settingsPayload(action));
@@ -3797,6 +3869,7 @@ function send(action) {{
 }}
 function applySettingsState(data) {{
   if(!data||data.type!=='settings-state')return;
+  spoolCommand.value=data.spool_id_command_template||{json.dumps(DEFAULT_SPOOL_ID_COMMAND)};previewSpoolCommand();
   nameTemplate.value=data.profile_name_template||{json.dumps(DEFAULT_PROFILE_NAME_TEMPLATE)};previewName();
   url.value=data.spoolman_url||{json.dumps(DEFAULT_SPOOLMAN_URL)};
   showPage.checked=data.show_pipspool_page!==false;
@@ -3878,7 +3951,10 @@ document.addEventListener('DOMContentLoaded', function() {{ startSettingsBridge(
                         raise ValueError("Low-stock warning threshold must be 0 grams or more")
                     updated_name_template = validate_profile_name_template(data.get("profile_name_template", profile_name_template()))
                     naming_changed = updated_name_template != profile_name_template()
+                    updated_spool_command = validate_spool_id_command_template(data.get("spool_id_command_template", spool_id_command_template()))
+                    spool_command_changed = updated_spool_command != spool_id_command_template()
                     settings_update = {
+                        "spool_id_command_template": updated_spool_command,
                         "profile_name_template": updated_name_template,
                         "spoolman_url": normalize_url(data.get("url", "")),
                         "show_pipspool_page": updated_show_page,
@@ -3895,6 +3971,8 @@ document.addEventListener('DOMContentLoaded', function() {{ startSettingsBridge(
                         raise RuntimeError("OrcaSlicer could not save PipSpool settings")
                     window.close()
                     message = "PipSpool settings saved."
+                    if spool_command_changed:
+                        message += "\n\nSynchronize to apply the spool-ID command. Restart OrcaSlicer after profiles change."
                     if naming_changed:
                         message += "\n\nSynchronize to apply profile naming. Restart OrcaSlicer after profiles are renamed."
                     if visibility_changed:

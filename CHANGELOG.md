@@ -2,6 +2,18 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.14] - 2026-10-20
+
+- Added a configurable spool-ID command in PipSpool Settings for issue #16, keeping `SET_ACTIVE_SPOOL ID={spool_id}` as the default.
+- Replaced `{spool_id}` with each physical Spoolman spool ID when generating profiles; templates are validated as single-line commands with exactly one spool-ID placeholder.
+- Added an example preview, reset-to-default control and durable command preferences through Orca configuration and the existing settings mirror.
+- Added printer/firmware examples for Klipper/Moonraker, issue-reported Anycubic GoKlipper M555 bridges, custom macro aliases, and setups where spool-ID injection should be disabled.
+- Retained per-spool custom Start G-code overrides and added literal `{spool_id}` substitution while preserving other Orca/Klipper expressions.
+- Preserved the existing dashboard off switch, including removal of configured managed commands while retaining unrelated Start G-code. Changing the template does not re-enable disabled output.
+- Applied managed spool identity after advanced/shared Start G-code so sibling data cannot restore the wrong spool ID or defeat the off switch.
+- Passed 117 regression tests and 39 focused tests; validated Settings preview/reset/save/reload behavior and all five stable packages for Python syntax, numeric metadata, matching contents and the localhost default.
+- Included Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon packages.
+
 ## [2.2.13] - 2026-10-20
 
 - Added a per-spool **Sync** action. When advanced fields are selected, the action reconciles the selected spool's shared-Filament group with existing sibling conflict protection; unrelated Filaments and archived-profile cleanup remain outside its scope.
