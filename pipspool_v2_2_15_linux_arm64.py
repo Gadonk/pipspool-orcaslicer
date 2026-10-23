@@ -5,7 +5,7 @@
 # name = "PipSpool"
 # description = "Spoolman synchronization plugin for OrcaSlicer"
 # author = "Donko"
-# version = "2.2.14"
+# version = "2.2.15"
 # ///
 
 """PipSpool: synchronize Spoolman inventory into OrcaSlicer presets.
@@ -36,7 +36,7 @@ import orca
 # Public default. Configure the Spoolman server address in PipSpool Settings.
 DEFAULT_SPOOLMAN_URL = "http://localhost:7912"
 DEFAULT_LOW_STOCK_THRESHOLD_GRAMS = 100.0
-PLUGIN_VERSION = "2.2.14"
+PLUGIN_VERSION = "2.2.15"
 ORCA_PLUGIN_API_BASELINE = "2.5.0-alpha"
 COPYRIGHT_YEAR = 2026
 FEEDBACK_URL = "https://github.com/Gadonk/pipspool-orcaslicer/issues"
@@ -1481,6 +1481,14 @@ def desired_preset(
             if key in reconciled_settings:
                 preset.pop(key, None)
         preset.update(decoded_orca_overrides(filament, reconciled_settings))
+        # Generated nozzle/bed defaults overlap selected advanced fields.
+        # A conflict must preserve the original override (or inheritance), not
+        # silently replace it with the ordinary Spoolman temperature.
+        for setting in conflicted.intersection(selected_settings):
+            if setting in existing:
+                preset[setting] = existing[setting]
+            else:
+                preset.pop(setting, None)
 
     # Apply identity last so shared advanced Start G-code cannot restore another
     # spool's managed ID or defeat the dashboard off switch.
@@ -1580,18 +1588,17 @@ def synchronize_filament_settings(
                 )
                 local = {}
             effective = profiles.effective_preset(effective)
-            live_names = (
-                profiles.parent_for(vendor, material),
-                str(effective.get("inherits") or ""),
-                str(effective.get("name") or ""),
-            )
-            for preset_name in live_names:
-                if preset_name in live_preset_values:
-                    effective.update({
-                        key: value
-                        for key, value in live_preset_values[preset_name].items()
-                        if key not in ORCA_DEPENDENCY_KEYS
-                    })
+            # Parent snapshots supply defaults only. They must never mask an
+            # explicit value saved in this physical spool's profile.
+            for parent_name in (profiles.parent_for(vendor, material),
+                                str(effective.get("inherits") or "")):
+                for key, value in live_preset_values.get(parent_name, {}).items():
+                    if key not in ORCA_DEPENDENCY_KEYS:
+                        effective.setdefault(key, value)
+            # Only the matching spool profile may override its effective values.
+            for key, value in live_preset_values.get(str(local.get("name") or ""), {}).items():
+                if key not in ORCA_DEPENDENCY_KEYS:
+                    effective[key] = value
             resolved_profiles.append((spool_id, local, effective))
 
         extras = dict(filament.get("extra") or {})
@@ -2384,7 +2391,7 @@ class SyncCapability(orca.script.ScriptPluginCapabilityBase):
                 report, _spools = sync_with_spoolman(
                     selected_settings, remove_unselected, live_preset_values
                 )
-                suffix = "\n\nRestart OrcaSlicer to load changed presets." if report.changed else ""
+                suffix = "\n\nRestart OrcaSlicer to load changed presets." if report.restart_required else ""
                 show_message(report.summary() + suffix, icon="warning" if report.errors else "info")
             except Exception as exc:
                 log(f"[SYNC ERROR] {exc}")

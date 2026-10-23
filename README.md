@@ -213,7 +213,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.14 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.15 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is aligned with the public OrcaSlicer 2.5.0 Alpha
 Python-plugin metadata, lifecycle-event, hosted-page and background-worker APIs.
 Compatibility guards keep manual synchronization and the established fallback
@@ -261,3 +261,13 @@ PipSpool is maintained and copyrighted by **Donko** and distributed under the
 The PipSpool logo is original artwork based on Donko's Pip character and an
 independently designed filament-spool/database motif. It does not reproduce the
 official Spoolman logo or wordmark.
+
+### Synchronization corrections in 2.2.15
+
+Saved per-spool advanced values are preserved over live parent-preset defaults.
+Only the matching live spool profile can override those effective values. Selected
+fields still synchronize through the shared Spoolman Filament; conflicting sibling
+edits remain preserved and reported, including nozzle and plate temperatures.
+Pure Orca-to-Spoolman exports no longer request a restart from the manual sync
+action. Imports into sibling profiles and other disk-profile changes can still
+require a restart. Manual confirmation of issue #17's reported workflow is pending.

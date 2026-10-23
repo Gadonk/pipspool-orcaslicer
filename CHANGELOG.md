@@ -2,6 +2,14 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.15] - 2026-10-23
+
+- Fixed a synchronization precedence defect investigated for issue #17: live parent-preset defaults no longer mask explicit values saved in an individual spool profile; matching live spool-profile values remain authoritative.
+- Preserved per-field shared-Filament reconciliation and conflicting sibling edits. Conflicted advanced nozzle/plate temperatures retain their original override or inheritance instead of falling back to ordinary generated Spoolman temperatures.
+- Fixed the manual synchronization action's restart notice to use direction-aware tracking: pure exports need no restart, while sibling imports or other profile changes can still require one.
+- Passed 117 private regression tests and 44 focused tests, including multi-field edits, exact live-profile matching, sibling conflicts, temperature preservation and restart behavior. Reporter-specific manual OrcaSlicer validation remains pending.
+- Included matching Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon packages.
+
 ## [2.2.14] - 2026-10-20
 
 - Added a configurable spool-ID command in PipSpool Settings for issue #16, keeping `SET_ACTIVE_SPOOL ID={spool_id}` as the default.
