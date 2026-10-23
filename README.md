@@ -41,6 +41,7 @@ The integrated PipSpool page brings daily controls and useful information into
 one place:
 
 - Clear connection health with Happy or Sad Pip artwork.
+- A saved theme selector beside **Feedback**, with built-in palettes and optional local wallpaper.
 - Searchable active-spool overview with remaining weight, nozzle temperature and
   bed temperature.
 - A compact **Columns** menu with saved visibility choices for Filament,
@@ -75,6 +76,24 @@ Advanced field synchronization is opt-in. No advanced fields are selected by
 default, and ordinary spool details, temperatures and spool-ID G-code continue
 to work without enabling it. List-valued dependency settings such as Compatible
 Printers and Compatible Prints retain their full values in both directions.
+
+## Dashboard themes
+
+Choose **PipSpool Classic**, **Light**, **Forest**, **Rosewood** or **Bonus Treat**
+from the dropdown beside **Feedback**. Changes apply immediately and your
+selection is remembered. Rosewood uses rich red surfaces and ruby actions;
+Bonus Treat adds pumpkin-orange accents and matching Pip artwork.
+
+For a custom theme, open the dashboard once to create `example.json` in your
+themes folder. Copy or edit that file to set colours and optional wallpaper
+properties together in one JSON file. Put a referenced PNG, JPEG or WebP in the
+folder's `images` subfolder, then click **Refresh**. Hover over the dropdown for
+the exact folder path. Custom options show their JSON filename beside the name.
+
+See the [theme guide](THEME_GUIDE.md) for default paths on every supported
+platform, a complete example, image limits and sharing instructions. A
+[starter theme file](themes/example.json) is also included. Themes change the
+dashboard appearance; selecting a theme does not synchronize or rename profiles.
 
 ## Install and connect
 
@@ -213,7 +232,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.15 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.16 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is aligned with the public OrcaSlicer 2.5.0 Alpha
 Python-plugin metadata, lifecycle-event, hosted-page and background-worker APIs.
 Compatibility guards keep manual synchronization and the established fallback
@@ -270,4 +289,6 @@ fields still synchronize through the shared Spoolman Filament; conflicting sibli
 edits remain preserved and reported, including nozzle and plate temperatures.
 Pure Orca-to-Spoolman exports no longer request a restart from the manual sync
 action. Imports into sibling profiles and other disk-profile changes can still
-require a restart. Manual confirmation of issue #17's reported workflow is pending.
+require a restart. The reporter has since described remaining sync-back failures
+in some existing profiles; investigation continues in [issue #17](https://github.com/Gadonk/pipspool-orcaslicer/issues/17).
+Version 2.2.16 adds dashboard themes and does not claim to resolve that follow-up.

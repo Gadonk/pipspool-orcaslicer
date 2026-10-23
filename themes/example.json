@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "name": "Example theme",
+  "colors": {
+    "background": "#030914",
+    "surface": "#08264b",
+    "surface_alt": "#061a33",
+    "text": "#f5ead8",
+    "muted": "#a9bfd4",
+    "accent": "#168cff",
+    "accent_text": "#03101e",
+    "border": "#1767a8",
+    "heading": "#f1dfc7",
+    "highlight": "#42e5ea",
+    "good": "#67d39a",
+    "warning": "#f2a43a",
+    "danger": "#f07168"
+  },
+  "background_image": "",
+  "background_opacity": 0.35
+}

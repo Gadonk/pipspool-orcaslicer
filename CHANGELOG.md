@@ -2,6 +2,17 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.16] - 2026-10-23
+
+- Added a saved dashboard theme selector beside Feedback, with Classic, Light, Forest, rich-red Rosewood and a Bonus Treat appearance.
+- Added custom JSON palettes and optional local PNG, JPEG or WebP wallpapers. Colours and wallpaper settings share one JSON file; custom options show the filename for easy editing.
+- Included an editable starter theme and a GitHub-ready theme guide with default installation paths for all five supported platforms, image limits and sharing instructions.
+- Improved dashboard colour coverage and readable controls, including dropdowns, selected filters, advanced-field tabs and reports. The active-spool table now fills its card's available scrolling area.
+- Kept theme changes separate from spool identification, profile synchronization and shared-Filament conflict handling. Custom theme data never executes code or downloads remote images.
+- Passed 195 automated tests, rendered-dashboard checks and text-contrast checks. All five stable packages share the same verified source and numeric 2.2.16 metadata.
+- Known issue: further reports of sync-back failures in some existing profiles are being investigated in [#17](https://github.com/Gadonk/pipspool-orcaslicer/issues/17); this theme release does not claim to fix that follow-up.
+- Included Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon packages.
+
 ## [2.2.15] - 2026-10-23
 
 - Fixed a synchronization precedence defect investigated for issue #17: live parent-preset defaults no longer mask explicit values saved in an individual spool profile; matching live spool-profile values remain authoritative.
