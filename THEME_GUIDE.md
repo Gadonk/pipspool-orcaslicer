@@ -166,8 +166,8 @@ To remove a background, set `background_image` to an empty string or remove it f
 | Key | Controls |
 | --- | --- |
 | `background` | Page background. |
-| `surface` | Cards, table headings and secondary button hover backgrounds. |
-| `surface_alt` | Inputs, dropdowns, secondary buttons, badges, menus and report areas. |
+| `surface` | Cards, table headings, empty gate/toolhead slots and secondary button hover backgrounds. |
+| `surface_alt` | Inputs, dropdowns, secondary buttons, badges, menus, report areas and loaded gate/toolhead cards. |
 | `text` | Main text and control labels. |
 | `muted` | Secondary descriptions and labels. |
 | `accent` | Primary actions, active tabs, selected filters and checkbox accents. |

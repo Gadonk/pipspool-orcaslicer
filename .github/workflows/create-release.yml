@@ -20,6 +20,9 @@ jobs:
       - name: Check out release source
         uses: actions/checkout@v4
 
+      - name: Check complete release upload size
+        run: python3 .github/scripts/check_release_payload.py
+
       - name: Create or update release
         shell: bash
         env:

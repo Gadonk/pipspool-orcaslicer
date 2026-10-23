@@ -20,6 +20,9 @@ jobs:
       - name: Validate Python syntax
         run: python -m py_compile pipspool_*.py
 
+      - name: Check complete release upload size
+        run: python .github/scripts/check_release_payload.py
+
       - name: Validate Orca 2.5 plugin metadata
         run: grep -R '# requires-python = ">=3.12"' --include="pipspool_*.py" .
 

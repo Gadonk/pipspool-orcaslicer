@@ -82,7 +82,10 @@ Printers and Compatible Prints retain their full values in both directions.
 Choose **PipSpool Classic**, **Light**, **Forest**, **Rosewood** or **Bonus Treat**
 from the dropdown beside **Feedback**. Changes apply immediately and your
 selection is remembered. Rosewood uses rich red surfaces and ruby actions;
-Bonus Treat adds pumpkin-orange accents and matching Pip artwork.
+Bonus Treat adds pumpkin-orange accents and matching Pip artwork. Loaded and
+empty gate/toolhead cards follow the selected palette too, while filament colours
+and remaining-weight gauges keep their meaning. Light theme uses readable
+labels on matching light toolhead cards.
 
 For a custom theme, open the dashboard once to create `example.json` in your
 themes folder. Copy or edit that file to set colours and optional wallpaper
@@ -232,7 +235,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.16 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.17 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is aligned with the public OrcaSlicer 2.5.0 Alpha
 Python-plugin metadata, lifecycle-event, hosted-page and background-worker APIs.
 Compatibility guards keep manual synchronization and the established fallback
@@ -265,6 +268,10 @@ OrcaSlicer's Python plugin API is new and may change in future builds.
 
 ## Privacy and release safety
 
+Version 2.2.17 uses optimized embedded artwork, bringing all five platform files
+to about 27 MB combined. Release workflows check the combined upload size before
+creating a draft or contacting Orca Cloud.
+
 PipSpool synchronizes with the Spoolman address saved in its settings. Its
 installed-version notice also checks the public GitHub release API. The public
 source defaults to `http://localhost:7912`; configure your actual server address
@@ -291,4 +298,4 @@ Pure Orca-to-Spoolman exports no longer request a restart from the manual sync
 action. Imports into sibling profiles and other disk-profile changes can still
 require a restart. The reporter has since described remaining sync-back failures
 in some existing profiles; investigation continues in [issue #17](https://github.com/Gadonk/pipspool-orcaslicer/issues/17).
-Version 2.2.16 adds dashboard themes and does not claim to resolve that follow-up.
+The theme and artwork updates do not claim to resolve that follow-up.

@@ -2,6 +2,18 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.17] - 2026-10-23
+
+- Reduced embedded artwork size by about 91% while retaining full-resolution wallpapers and transparent, appropriately sized Pip artwork. The complete five-platform payload is now about 27 MB instead of 294 MB, addressing the upload-size failure affecting 2.2.16.
+- Fixed gate/toolhead cards retaining blue Classic styling when another theme is selected. Loaded and empty cards now follow built-in and custom palettes, including their labels and borders.
+- Fixed unreadable gate-material and printer labels in Light theme; empty-slot labels remain readable without fading the entire card.
+- Preserved filament-path colours, remaining-weight gauges, low-stock indicators and problem borders when switching themes. Classic restores its original appearance.
+- Updated the theme guide with the palette keys controlling loaded and empty toolhead cards.
+- Added aggregate upload-size checks before draft creation and Orca Cloud publishing, with headroom below the release limit.
+- Passed 198 automated tests and populated-dashboard browser checks across all built-in themes and a custom palette. Spool identification, synchronization and shared-Filament conflict protection are unchanged.
+- Further sync-back reports in existing profiles remain under investigation in [#17](https://github.com/Gadonk/pipspool-orcaslicer/issues/17); this update does not claim to fix that follow-up.
+- Included Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon packages.
+
 ## [2.2.16] - 2026-10-23
 
 - Added a saved dashboard theme selector beside Feedback, with Classic, Light, Forest, rich-red Rosewood and a Bonus Treat appearance.
