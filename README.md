@@ -13,6 +13,13 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
+## Current release: 2.2.18
+
+PipSpool now ships as one universal wheel with artwork stored separately from
+Python source. Existing settings and custom themes retain their locations.
+The release includes the themes and dashboard improvements from 2.2.16 and
+2.2.17; see the [changelog](CHANGELOG.md#2218---2026-10-24).
+
 ## At a glance
 
 - One OrcaSlicer filament profile for each active Spoolman spool.
@@ -113,11 +120,15 @@ dashboard appearance; selecting a theme does not synchronize or rename profiles.
 
 ### Manual installation
 
-1. Download the `.py` file matching your operating system and CPU from the
+1. Download `pipspool-2.2.18-py3-none-any.whl` from the
    [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
+   The same wheel supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+   and macOS Apple Silicon. Select the wheel directly; do not unpack it or run pip.
 2. Open **File → Plugins** in OrcaSlicer.
 3. Choose **Install local plugin** and select the downloaded file.
-4. Activate PipSpool and follow the connection steps above.
+4. Disable any previous locally installed PipSpool or development copy, then
+   activate the new copy and follow the connection steps above. Local packages
+   have their own Orca identity; only one PipSpool copy should be active.
 
 The setup window opens automatically only when no valid settings have been
 saved. It remains available through PipSpool's setup action. PipSpool stores
@@ -235,7 +246,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.17 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.18 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is aligned with the public OrcaSlicer 2.5.0 Alpha
 Python-plugin metadata, lifecycle-event, hosted-page and background-worker APIs.
 Compatibility guards keep manual synchronization and the established fallback
@@ -268,16 +279,18 @@ OrcaSlicer's Python plugin API is new and may change in future builds.
 
 ## Privacy and release safety
 
-Version 2.2.17 uses optimized embedded artwork, bringing all five platform files
-to about 27 MB combined. Release workflows check the combined upload size before
-creating a draft or contacting Orca Cloud.
+Version 2.2.18 uses one universal wheel of about 4 MB, with bundled artwork stored
+as separate local package resources. Release workflows validate the wheel's
+metadata, file hashes, source, artwork and upload size before creating a draft or
+contacting Orca Cloud. Packaging does not determine Orca Cloud's security rating;
+that rating comes from Orca Cloud's own review.
 
 PipSpool synchronizes with the Spoolman address saved in its settings. Its
 installed-version notice also checks the public GitHub release API. The public
 source defaults to `http://localhost:7912`; configure your actual server address
 during setup. GitHub Actions rejects private development addresses from release
-artifacts. Every platform package is also checked for valid Python syntax and
-complete embedded artwork before release.
+artifacts. The universal wheel is checked for valid Python syntax and complete
+bundled artwork before release.
 
 ## License
 

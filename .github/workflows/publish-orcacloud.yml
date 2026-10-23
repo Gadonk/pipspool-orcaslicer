@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Check out release
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
 
       - name: Check complete release upload size
         run: python3 .github/scripts/check_release_payload.py
@@ -27,27 +29,9 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
           version="${GITHUB_REF_NAME#v}"
-          file_version="${version//./_}"
-          files=(pipspool_v"${file_version}"_*.py)
-          if [ "${#files[@]}" -ne 5 ]; then
-            echo "Expected five platform files for ${version}, found ${#files[@]}: ${files[*]-}" >&2
-            exit 1
-          fi
-          expected_metadata="# version = \"${version}\""
-          for file in "${files[@]}"; do
-            grep -Fqx "$expected_metadata" "$file"
-            grep -Fqx '# dependencies = []' "$file"
-            grep -Fqx '# requires-python = ">=3.12"' "$file"
-            grep -Fqx 'DEFAULT_SPOOLMAN_URL = "http://localhost:7912"' "$file"
-            if grep -Eq 'https?://(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.)' "$file"; then
-              echo "Private-network Spoolman address found in $file." >&2
-              exit 1
-            fi
-            if grep -Fq -- '-dev' "$file"; then
-              echo "Development marker found in $file." >&2
-              exit 1
-            fi
-          done
+          validated_version="$(python3 .github/scripts/check_release_payload.py --version-only)"
+          test "$version" = "$validated_version"
+          files=("pipspool-${version}-py3-none-any.whl")
           {
             echo "PIPSPOOL_VERSION=$version"
             echo 'PLUGIN_FILES<<EOF'

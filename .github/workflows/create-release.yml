@@ -1,13 +1,13 @@
 name: Create GitHub Release
 
-# A normal GitHub push or manual dispatch prepares the stable release draft.
-
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
-      - "pipspool_v*.py"
+      - "pipspool*.whl"
+      - "CHANGELOG.md"
+      - ".github/scripts/check_release_payload.py"
       - ".github/workflows/create-release.yml"
 
 permissions:
@@ -17,79 +17,30 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out release source
-        uses: actions/checkout@v4
-
-      - name: Check complete release upload size
+      - uses: actions/checkout@v4
+      - name: Validate stable wheel and upload size
         run: python3 .github/scripts/check_release_payload.py
-
-      - name: Create or update release
+      - name: Create or update unpublished draft
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          shopt -s nullglob
-          version="$(for artifact in pipspool_v*.py; do
-            sed -n 's/^# version = "\([0-9][0-9.]*\)"/\1/p' "$artifact"
-          done | sort -V | tail -n 1)"
-          file_version="${version//./_}"
-          files=(pipspool_v"${file_version}"_*.py)
-          if [ "${#files[@]}" -ne 5 ]; then
-            echo "Expected five platform artifacts for ${version}, found ${#files[@]}" >&2
-            exit 1
-          fi
-
-          file="${files[0]}"
-          if [ -z "$version" ] || [[ "$version" == *-dev* ]]; then
-            echo "Invalid stable version metadata: $version" >&2
-            exit 1
-          fi
-          for artifact in "${files[@]}"; do
-            grep -Fqx "# version = \"${version}\"" "$artifact"
-          done
+          version="$(python3 .github/scripts/check_release_payload.py --version-only)"
+          file="pipspool-${version}-py3-none-any.whl"
           tag="v${version}"
-
           awk -v version="$version" '
             index($0, "## [" version "] - ") == 1 { found=1; next }
             found && /^## \[/ { exit }
             found { print }
           ' CHANGELOG.md > release-notes.md
-          if [ ! -s release-notes.md ]; then
-            echo "No CHANGELOG section found for $version" >&2
-            exit 1
-          fi
-
+          test -s release-notes.md
+          test "$(wc -c < release-notes.md)" -le 4000
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "${files[@]}" --clobber
-            if [ "$(gh release view "$tag" --json isDraft --jq .isDraft)" = "true" ]; then
-              gh release edit "$tag" --target "$GITHUB_SHA" --draft --title "PipSpool $version" --notes-file release-notes.md
-            else
-              gh release edit "$tag" --target "$GITHUB_SHA" --title "PipSpool $version" --notes-file release-notes.md
-            fi
+            test "$(gh release view "$tag" --json isDraft --jq .isDraft)" = "true"
+            gh release upload "$tag" "$file" --clobber
+            gh release edit "$tag" --target "$GITHUB_SHA" --draft --title "PipSpool $version" --notes-file release-notes.md
           else
-            gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" \
-              --draft --title "PipSpool $version" --notes-file release-notes.md
+            gh release create "$tag" "$file" --target "$GITHUB_SHA" --draft \
+              --title "PipSpool $version" --notes-file release-notes.md
           fi
-
-      - name: Remove superseded root artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          version="$(for artifact in pipspool_v*.py; do
-            sed -n 's/^# version = "\([0-9][0-9.]*\)"/\1/p' "$artifact"
-          done | sort -V | tail -n 1)"
-          file_version="${version//./_}"
-          stale=()
-          for artifact in pipspool_v*.py; do
-            [[ "$artifact" == pipspool_v"${file_version}"_*.py ]] || stale+=("$artifact")
-          done
-          if [ "${#stale[@]}" -eq 0 ]; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm -- "${stale[@]}"
-          git commit -m "Remove superseded PipSpool release files [skip ci]"
-          git push

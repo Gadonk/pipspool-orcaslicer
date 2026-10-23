@@ -2,6 +2,36 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.18] - 2026-10-24
+
+### Included from 2.2.16
+
+- Saved dashboard theme selector beside Feedback: Classic, Light, Forest, rich-red Rosewood and Bonus Treat.
+- Custom JSON palettes and optional local PNG, JPEG or WebP wallpapers, with colours and wallpaper settings together in one JSON file.
+- Editable starter theme and a theme guide with default paths on every supported platform, image limits and sharing instructions.
+- Improved dropdowns, selected filters, advanced-field tabs and reports; the active-spool table fills its card's scrolling area.
+
+### Included from 2.2.17
+
+- Reduced artwork size by about 91%, addressing the upload-size failure affecting 2.2.16 while retaining full-resolution wallpapers and transparent Pip artwork.
+- Loaded and empty gate/toolhead cards follow built-in and custom palettes, including labels and borders. Fixed unreadable Light-theme material and printer labels.
+- Preserved filament-path colours, remaining-weight gauges, low-stock indicators and problem borders when switching themes; Classic restores its original appearance.
+- Updated the theme guide's toolhead-card palette reference and added release upload-size checks.
+
+### New in 2.2.18
+
+- Switched to one universal Python wheel for Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon.
+- Moved bundled artwork out of Python source into separate local package resources. The wheel is about 4 MB, and its Python entry file is about 228 KB. No remote artwork downloads or additional dependencies.
+- Retained existing settings and custom-theme locations, spool identification, per-spool synchronization and shared-Filament conflict protection.
+- Validated wheel metadata, file hashes, artwork and the stable build; both test suites pass. The development wheel also passed manual testing in OrcaSlicer.
+- Updated manual installation instructions and the GitHub draft/publishing workflows for wheel packages. Disable any local test copy before activating the released version.
+
+This packaging change makes the Python source easier to inspect; Orca Cloud determines the security rating after its own review. A lower risk rating is not guaranteed.
+
+Further sync-back reports in existing profiles remain under investigation in [#17](https://github.com/Gadonk/pipspool-orcaslicer/issues/17); this release does not claim to fix that follow-up.
+
+Full history: https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md
+
 ## [2.2.17] - 2026-10-23
 
 ### 2.2.17

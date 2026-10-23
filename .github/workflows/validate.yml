@@ -5,34 +5,16 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Validate Python syntax
-        run: python -m py_compile pipspool_*.py
-
-      - name: Check complete release upload size
+      - name: Validate stable wheel, resources and upload size
         run: python .github/scripts/check_release_payload.py
-
-      - name: Validate Orca 2.5 plugin metadata
-        run: grep -R '# requires-python = ">=3.12"' --include="pipspool_*.py" .
-
-      - name: Reject private network data
-        run: |
-          if grep -R "192\.168\.0\.3" --include="*.py" .; then
-            echo "Private development Spoolman address found."
-            exit 1
-          fi
-
-      - name: Enforce release-safe default on tags
-        if: startsWith(github.ref, 'refs/tags/')
-        run: grep -R 'DEFAULT_SPOOLMAN_URL = "http://localhost:7912"' --include="*.py" .
