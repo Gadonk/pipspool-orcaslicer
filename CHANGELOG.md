@@ -4,6 +4,8 @@ All notable PipSpool changes are documented here.
 
 ## [2.2.17] - 2026-10-23
 
+### 2.2.17
+
 - Reduced embedded artwork size by about 91% while retaining full-resolution wallpapers and transparent, appropriately sized Pip artwork. The complete five-platform payload is now about 27 MB instead of 294 MB, addressing the upload-size failure affecting 2.2.16.
 - Fixed gate/toolhead cards retaining blue Classic styling when another theme is selected. Loaded and empty cards now follow built-in and custom palettes, including their labels and borders.
 - Fixed unreadable gate-material and printer labels in Light theme; empty-slot labels remain readable without fading the entire card.
@@ -13,6 +15,24 @@ All notable PipSpool changes are documented here.
 - Passed 198 automated tests and populated-dashboard browser checks across all built-in themes and a custom palette. Spool identification, synchronization and shared-Filament conflict protection are unchanged.
 - Further sync-back reports in existing profiles remain under investigation in [#17](https://github.com/Gadonk/pipspool-orcaslicer/issues/17); this update does not claim to fix that follow-up.
 - Included Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel and macOS Apple Silicon packages.
+
+### Catch-up history: 2.2.6 through 2.2.16
+
+This summary includes the 2.2.16 changes that did not reach Orca Cloud.
+
+- **2.2.16:** Saved dashboard themes, local wallpapers, single-file custom palettes, an editable example and theme guide, plus improved active-spool scrolling.
+- **2.2.15:** Corrected saved-profile versus parent-value precedence and restart notices while preserving sibling temperature conflicts. Further reports remain tracked in #17.
+- **2.2.14:** Configurable active-spool commands with `{spool_id}`, printer/firmware examples and the existing off switch.
+- **2.2.13:** Per-spool Sync, configurable profile names with mandatory spool identity, and permission-denial retry guidance.
+- **2.2.12:** Orca 2.5 Alpha/Python 3.12 alignment and recoverable background-worker permission handling.
+- **2.2.11:** Fixed Select all and Clear to cover the complete active advanced-field tab.
+- **2.2.10:** Debounced lifecycle refreshes, reload-safe settings and the corrected default `SET_ACTIVE_SPOOL` command.
+- **2.2.9:** Vendor preset discovery, shared-Filament propagation with sibling conflict protection, live-count filters, sorting and clearer pending-change diagnostics.
+- **2.2.8:** Recovered profiles hidden by malformed compatibility lists while preserving explicitly selected dependency restrictions.
+- **2.2.7:** Added managed spool-ID G-code disabling, fixed dependency-list round trips and removed the external networking dependency.
+- **2.2.6:** Added Orca-style advanced-field tabs and opt-in retraction, Z-hop, wiping, ironing, G-code, notes and dependency synchronization.
+
+Full history: https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md
 
 ## [2.2.16] - 2026-10-23
 
