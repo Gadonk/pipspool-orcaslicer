@@ -13,12 +13,12 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
-## Current release: 2.2.18
+## Current release: 2.2.19
 
-PipSpool now ships as one universal wheel with artwork stored separately from
-Python source. Existing settings and custom themes retain their locations.
-The release includes the themes and dashboard improvements from 2.2.16 and
-2.2.17; see the [changelog](CHANGELOG.md#2218---2026-10-24).
+The dashboard now shows spool inventory before background profile checks finish,
+reduces repeated loading work, and offers a themed diagnostic preview/export.
+Shared Filament settings remain the default; Settings also offers independent
+advanced values per spool. See the [changelog](CHANGELOG.md#2219---2026-10-25).
 
 ## At a glance
 
@@ -120,7 +120,7 @@ dashboard appearance; selecting a theme does not synchronize or rename profiles.
 
 ### Manual installation
 
-1. Download `pipspool-2.2.18-py3-none-any.whl` from the
+1. Download `pipspool-2.2.19-py3-none-any.whl` from the
    [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
    The same wheel supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
    and macOS Apple Silicon. Select the wheel directly; do not unpack it or run pip.
@@ -131,7 +131,7 @@ dashboard appearance; selecting a theme does not synchronize or rename profiles.
    have their own Orca identity; only one PipSpool copy should be active.
 
 The setup window opens automatically only when no valid settings have been
-saved. It remains available through PipSpool's setup action. PipSpool stores
+saved. It remains available through the dashboard's **Settings** button or PipSpool's setup action. PipSpool stores
 critical user settings through Orca's supported capability configuration and
 keeps its existing settings file as a compatibility mirror.
 
@@ -246,7 +246,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.18 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.19 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is aligned with the public OrcaSlicer 2.5.0 Alpha
 Python-plugin metadata, lifecycle-event, hosted-page and background-worker APIs.
 Compatibility guards keep manual synchronization and the established fallback
@@ -277,9 +277,35 @@ legitimately require approval. PipSpool does not edit or bypass Orca's grants.
 
 OrcaSlicer's Python plugin API is new and may change in future builds.
 
+## Advanced setting scope and diagnostics
+
+Open **Settings → Advanced setting scope** to choose shared Filament settings
+(the default) or independent settings for each spool. Shared mode propagates
+selected values to sibling profiles using the same Spoolman Filament. Independent
+mode stores selected values on each Spoolman spool. Returning to shared mode with
+differing sibling values reports a conflict rather than choosing a silent winner.
+
+Click **Diagnostics** to open a window matching the selected theme. Review the
+anonymous numeric comparisons before exporting. Enter your chosen absolute path
+and `.json` filename in an existing folder; the exact reviewed report is saved
+there and existing files are preserved. The current Orca plugin API has no native
+Save As picker, so export uses a path field. Nothing is sent automatically. Reports
+omit raw logs, credentials, server addresses, paths, profile names, original IDs
+and G-code. Collect reports before and after a suspected reset; after-only data
+cannot recover the preceding values. Historical error logs are not included.
+
+The first dashboard connection uses a real read-only request through Orca's UI
+callback so the released alpha can show its permission prompts. If refused, use
+**Allow connection** to retry explicitly. Automatic attempts pause after denial.
+The first request may pause the interface while the server responds or you answer
+an approval prompt. After a successful read, spools appear and profile checks
+continue in the background. Timing details are written to the local PipSpool log.
+This does not require a PR test build or bypass Orca's permissions; older-host
+permission persistence limitations described above still apply.
+
 ## Privacy and release safety
 
-Version 2.2.18 uses one universal wheel of about 4 MB, with bundled artwork stored
+Version 2.2.19 uses one universal wheel of about 4 MB, with bundled artwork stored
 as separate local package resources. Release workflows validate the wheel's
 metadata, file hashes, source, artwork and upload size before creating a draft or
 contacting Orca Cloud. Packaging does not determine Orca Cloud's security rating;
@@ -311,4 +337,4 @@ Pure Orca-to-Spoolman exports no longer request a restart from the manual sync
 action. Imports into sibling profiles and other disk-profile changes can still
 require a restart. The reporter has since described remaining sync-back failures
 in some existing profiles; investigation continues in [issue #17](https://github.com/Gadonk/pipspool-orcaslicer/issues/17).
-The theme and artwork updates do not claim to resolve that follow-up.
+The new safeguards and diagnostics improve investigation of that follow-up; issue #17 remains open pending confirmation.

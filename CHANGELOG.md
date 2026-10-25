@@ -2,6 +2,24 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.19] - 2026-10-25
+
+### Changes in 2.2.19
+
+- Show connection and spool inventory as soon as Spoolman responds, then check Orca profiles in the background. Pending profiles clearly show Checking.
+- Reduce repeated profile-file scans and avoid resending unchanged theme artwork on Refresh. Add local loading timings for troubleshooting.
+- Improve initial connection approval on OrcaSlicer 2.5.0 Alpha with a real read-only UI request, followed by background checks. Denied access offers Allow connection and an explicit retry; failed writes are never replayed automatically. Host permission prompts can still occur.
+- Add a Settings button on the dashboard.
+- Add an Advanced setting scope option: shared Spoolman Filament settings remain the default; individual mode keeps selected advanced values on each spool. Conflicting sibling edits remain protected.
+- Check all saved account copies during synchronization and prevent an unchanged live cache from hiding a saved edit. Preserve profiles when reconciliation fails and improve restart notices for actual sibling/copy imports.
+- Add a theme-matched Diagnostics popup with a preview of anonymous numeric saved/live/server/baseline comparisons. Export the exact reviewed JSON to an explicitly chosen full path; existing files are preserved. No automatic reporting or upload. Orca currently has no native Save As picker exposed to plugins.
+- Load artwork on first UI use and defer settings migration to the capability lifecycle, preserving saved page visibility and settings. A narrow own-settings read remains necessary during page registration.
+- Continue using one universal wheel for all five platforms, with artwork as separate package resources.
+
+Existing-profile sync-back reports in [issue #17](https://github.com/Gadonk/pipspool-orcaslicer/issues/17) and host permission persistence in [issue #13](https://github.com/Gadonk/pipspool-orcaslicer/issues/13) remain under investigation. This release adds protections and diagnostic tools; it does not claim every reported case is resolved.
+
+Full history: https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md
+
 ## [2.2.18] - 2026-10-24
 
 ### Included from 2.2.16
