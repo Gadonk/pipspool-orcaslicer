@@ -13,12 +13,11 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
-## Current release: 2.2.19
+## Current release: 2.2.20
 
-The dashboard now shows spool inventory before background profile checks finish,
-reduces repeated loading work, and offers a themed diagnostic preview/export.
-Shared Filament settings remain the default; Settings also offers independent
-advanced values per spool. See the [changelog](CHANGELOG.md#2219---2026-10-25).
+Volumetric speed and flow ratio now synchronize per extruder variant without
+losing the other values. Shared-Filament conflicts remain protected, and Diagnostics
+shows variant mappings. See the [changelog](CHANGELOG.md#2220---2026-10-26).
 
 ## At a glance
 
@@ -120,7 +119,7 @@ dashboard appearance; selecting a theme does not synchronize or rename profiles.
 
 ### Manual installation
 
-1. Download `pipspool-2.2.19-py3-none-any.whl` from the
+1. Download `pipspool-2.2.20-py3-none-any.whl` from the
    [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
    The same wheel supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
    and macOS Apple Silicon. Select the wheel directly; do not unpack it or run pip.
@@ -246,7 +245,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.19 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.20 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is aligned with the public OrcaSlicer 2.5.0 Alpha
 Python-plugin metadata, lifecycle-event, hosted-page and background-worker APIs.
 Compatibility guards keep manual synchronization and the established fallback
@@ -285,6 +284,27 @@ selected values to sibling profiles using the same Spoolman Filament. Independen
 mode stores selected values on each Spoolman spool. Returning to shared mode with
 differing sibling values reports a conflict rather than choosing a silent winner.
 
+### Per-extruder-variant values
+
+Orca profiles can contain multiple volumetric-speed and flow-ratio values, aligned
+with their extruder variants. PipSpool preserves this mapping and synchronizes
+changes to any variant. Reordering the list does not move a value to another
+variant. Compatible changes to different variants merge; conflicting edits to
+the same variant are reported and preserved.
+
+The original numeric Spoolman fields remain compatible. Additional Text fields
+`orca_filament_max_volumetric_speed__variants` and
+`orca_filament_flow_ratio__variants` store the versioned variant maps. Shared mode
+stores these on the Filament; individual mode stores them on each spool. When
+values differ by variant, the map holds those distinct values and the numeric
+field remains a legacy scalar—it cannot represent six different values. Uniform
+maps update the scalar too. Editing that scalar while a distinct map exists
+reports a conflict rather than guessing which variant to change. Review the
+mapping in Diagnostics and edit the intended Orca variant instead.
+
+Malformed or ambiguous mappings are preserved and reported. You should not need
+to manually clear arrays or edit profile JSON as part of normal synchronization.
+
 Click **Diagnostics** to open a window matching the selected theme. Review the
 anonymous numeric comparisons before exporting. Enter your chosen absolute path
 and `.json` filename in an existing folder; the exact reviewed report is saved
@@ -305,7 +325,7 @@ permission persistence limitations described above still apply.
 
 ## Privacy and release safety
 
-Version 2.2.19 uses one universal wheel of about 4 MB, with bundled artwork stored
+Version 2.2.20 uses one universal wheel of about 4 MB, with bundled artwork stored
 as separate local package resources. Release workflows validate the wheel's
 metadata, file hashes, source, artwork and upload size before creating a draft or
 contacting Orca Cloud. Packaging does not determine Orca Cloud's security rating;

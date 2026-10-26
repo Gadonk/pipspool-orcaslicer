@@ -2,6 +2,23 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.20] - 2026-10-26
+
+### Changes in 2.2.20
+
+- Fix volumetric-speed and flow-ratio synchronization for Orca profiles with multiple extruder variants. All variant values are preserved instead of reading only the first value and replacing the list with a singleton.
+- Match values to extruder/variant identities, so reordering a variant list cannot swap values. Edits to non-first variants now synchronize too.
+- Reconcile each variant independently. Compatible edits to different variants merge; conflicting edits to the same variant across shared Filament siblings or account copies are preserved and reported.
+- Prevent stale matching live values or an old live variant order from hiding a saved edit. Failed remote writes do not commit a successful synchronization baseline.
+- Keep shared Filament settings as the default and preserve independent per-spool mode. Returning to shared mode requires sibling agreement.
+- Retain the existing numeric Spoolman fields and add companion Text fields for variant maps. When variants differ, the companion map is authoritative and the original numeric field remains a legacy scalar. Uniform maps update that scalar. A scalar edit conflicting with distinct variant values is reported rather than silently broadcast.
+- Show variant labels and corresponding numeric values in diagnostic reports, including server and baseline maps. Recognized Orca labels are readable; custom labels are anonymized.
+- Preserve and report malformed or ambiguous mappings instead of discarding values. Existing plain scalar profiles remain compatible. No manual deletion of profile values should be needed as a normal workaround.
+
+This addresses the multi-variant data-loss cases reproduced from [issue #17](https://github.com/Gadonk/pipspool-orcaslicer/issues/17). The issue remains open pending reporter confirmation. If a problem remains, attach reviewed Diagnostics exports from before and after synchronization, with your Orca build and expected/actual values.
+
+Full history: https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md
+
 ## [2.2.19] - 2026-10-25
 
 ### Changes in 2.2.19
