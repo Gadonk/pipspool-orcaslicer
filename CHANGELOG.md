@@ -2,6 +2,21 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.21] - 2026-10-27
+
+### Changes in 2.2.21
+
+- Fix the Invalid variant layout errors caused by reading Orca's live preset API values as Python lists. Orca's API returns serialized strings; these are now decoded before synchronization.
+- Decode comma-separated numeric vectors and semicolon-separated, quoted string vectors using Orca's escaping rules. Preserve quotes, backslashes, semicolons and escaped newlines inside labels and G-code.
+- Normalize live extruder-variant labels, numeric extruder IDs and system material types at the API boundary. Native-vector bindings remain compatible.
+- Keep per-variant volumetric-speed and flow-ratio synchronization, saved-edit protection, and shared-Filament conflict protection. Malformed live data is reported and preserved rather than silently ignored or overwritten.
+- Add source-format and decoding-status information to Diagnostics without exporting raw serialized strings.
+- Add regression tests using the actual serialized API format, including non-first variant edits, stale live snapshots, conflicting sibling edits, quoted labels and diagnostic mappings.
+
+This corrects the live API decoding failure reported after 2.2.20 in [issue #17](https://github.com/Gadonk/pipspool-orcaslicer/issues/17). Reporter confirmation in Orca is still pending. If a problem remains, attach reviewed Diagnostics exports from before and after synchronization, with the selected fields, Orca build and expected/actual values.
+
+Full history: https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md
+
 ## [2.2.20] - 2026-10-26
 
 ### Changes in 2.2.20

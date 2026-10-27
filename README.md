@@ -13,11 +13,12 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
-## Current release: 2.2.20
+## Current release: 2.2.21
 
-Volumetric speed and flow ratio now synchronize per extruder variant without
-losing the other values. Shared-Filament conflicts remain protected, and Diagnostics
-shows variant mappings. See the [changelog](CHANGELOG.md#2220---2026-10-26).
+This update fixes decoding of Orca's live serialized preset values, addressing
+Invalid variant layout errors during synchronization. Per-variant settings,
+shared-Filament conflict protection and diagnostic mapping are retained.
+See the [changelog](CHANGELOG.md#2221---2026-10-27).
 
 ## At a glance
 
@@ -119,7 +120,7 @@ dashboard appearance; selecting a theme does not synchronize or rename profiles.
 
 ### Manual installation
 
-1. Download `pipspool-2.2.20-py3-none-any.whl` from the
+1. Download `pipspool-2.2.21-py3-none-any.whl` from the
    [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
    The same wheel supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
    and macOS Apple Silicon. Select the wheel directly; do not unpack it or run pip.
@@ -245,7 +246,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.20 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.21 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is aligned with the public OrcaSlicer 2.5.0 Alpha
 Python-plugin metadata, lifecycle-event, hosted-page and background-worker APIs.
 Compatibility guards keep manual synchronization and the established fallback
@@ -286,6 +287,12 @@ differing sibling values reports a conflict rather than choosing a silent winner
 
 ### Per-extruder-variant values
 
+Live values from Orca's plugin API are decoded from its serialized format before
+comparison: comma-separated numeric vectors and quoted, semicolon-separated
+string vectors. Quotes, escapes and embedded delimiters are preserved. Diagnostics
+also identifies the source format and whether decoding succeeded. Malformed
+live input is reported without overwriting the affected setting.
+
 Orca profiles can contain multiple volumetric-speed and flow-ratio values, aligned
 with their extruder variants. PipSpool preserves this mapping and synchronizes
 changes to any variant. Reordering the list does not move a value to another
@@ -325,7 +332,7 @@ permission persistence limitations described above still apply.
 
 ## Privacy and release safety
 
-Version 2.2.20 uses one universal wheel of about 4 MB, with bundled artwork stored
+Version 2.2.21 uses one universal wheel of about 4 MB, with bundled artwork stored
 as separate local package resources. Release workflows validate the wheel's
 metadata, file hashes, source, artwork and upload size before creating a draft or
 contacting Orca Cloud. Packaging does not determine Orca Cloud's security rating;
