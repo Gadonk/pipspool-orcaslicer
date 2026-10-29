@@ -13,12 +13,13 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
-## Current release: 2.2.21
+## Current release: 2.2.22
 
-This update fixes decoding of Orca's live serialized preset values, addressing
-Invalid variant layout errors during synchronization. Per-variant settings,
-shared-Filament conflict protection and diagnostic mapping are retained.
-See the [changelog](CHANGELOG.md#2221---2026-10-27).
+This update fixes field selection in Orca's PipSpool plugin menu: saved selections
+are passed in the expected format, host configuration changes update the checkboxes,
+and explicitly clearing the selection is respected. Shared-Filament and per-variant
+conflict protection are retained.
+See the [changelog](CHANGELOG.md#2222---2026-10-29).
 
 ## At a glance
 
@@ -120,7 +121,7 @@ dashboard appearance; selecting a theme does not synchronize or rename profiles.
 
 ### Manual installation
 
-1. Download `pipspool-2.2.21-py3-none-any.whl` from the
+1. Download `pipspool-2.2.22-py3-none-any.whl` from the
    [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
    The same wheel supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
    and macOS Apple Silicon. Select the wheel directly; do not unpack it or run pip.
@@ -246,7 +247,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.21 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.22 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is aligned with the public OrcaSlicer 2.5.0 Alpha
 Python-plugin metadata, lifecycle-event, hosted-page and background-worker APIs.
 Compatibility guards keep manual synchronization and the established fallback
@@ -332,7 +333,7 @@ permission persistence limitations described above still apply.
 
 ## Privacy and release safety
 
-Version 2.2.21 uses one universal wheel of about 4 MB, with bundled artwork stored
+Version 2.2.22 uses one universal wheel of about 4 MB, with bundled artwork stored
 as separate local package resources. Release workflows validate the wheel's
 metadata, file hashes, source, artwork and upload size before creating a draft or
 contacting Orca Cloud. Packaging does not determine Orca Cloud's security rating;

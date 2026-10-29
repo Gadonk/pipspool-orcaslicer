@@ -2,6 +2,20 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.22] - 2026-10-29
+
+### Changes in 2.2.22
+
+- Fix the plugin-menu field selector sending a JSON string where Orca's configuration bridge expects an object. This addresses the menu/dashboard selection mismatch reported in issue #17.
+- Follow Orca configuration updates so restored or updated selections populate the menu checkboxes correctly.
+- Recover older string-wrapped menu configurations and respect an explicitly saved empty selection instead of restoring cached dashboard fields.
+- Preserve the dashboard fallback for untouched legacy menu configurations, per-variant synchronization and shared-Filament conflict protection.
+- Add regression coverage for the generated menu JavaScript, host configuration callbacks, legacy settings and empty selections.
+
+In-Orca reporter confirmation is still pending. If synchronization remains incorrect, attach reviewed Diagnostics exports from before and after synchronization to [issue #17](https://github.com/Gadonk/pipspool-orcaslicer/issues/17), including your Orca build and expected/actual values. This release does not address the separate Filament ID Fixer compatibility report in issue #18.
+
+Full history: https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md
+
 ## [2.2.21] - 2026-10-27
 
 ### Changes in 2.2.21
