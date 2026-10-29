@@ -2,6 +2,22 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.23] - 2026-10-30
+
+### Changes in 2.2.23
+
+- Preserve standalone profiles with their own filament ID instead of reattaching them to a generic parent. This addresses the reproduced ID-reset case in #18 while retaining Spoolman spool matching and managed G-code.
+- Decode Orca percentage suffixes, Z-hop/surface enums and ramming text correctly. Preserve disabled nullable overrides without reporting their intentional nil values as corrupt API data (#19). Malformed values still fail safely.
+- Add pressure advance, its enable option, and adaptive pressure-advance enable, measurements, within-feature enable and bridge value to Advanced field synchronization (#20). Preserve per-variant values, shared-Filament conflict protection and independent-spool mode.
+- Keep Last synchronization output within a scrollable, wrapping panel. Add Show / hide output and Clear saved report; clearing persists without changing profiles, baselines or a genuine restart requirement (#21).
+- Retain the menu/dashboard field-selection fix from 2.2.22.
+
+Automated coverage includes custom root IDs, repeated synchronization, percentage export, disabled overrides, typed per-variant pressure-advance round trips, sibling conflicts and report controls. Both full suites pass against the stable wheel; a local browser check covers 300 long warnings.
+
+Reporter confirmation on macOS and the actual Filament ID Fixer/U1 workflow is still pending. The ID change covers standalone profiles with an explicit own ID; it does not claim every external-tool layout is resolved. Issue #13 remains pending Linux/upstream permission retesting. If problems remain, attach reviewed before/after Diagnostics and expected/actual values to the relevant issue. Issues remain open.
+
+Full history: https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md
+
 ## [2.2.22] - 2026-10-29
 
 ### Changes in 2.2.22

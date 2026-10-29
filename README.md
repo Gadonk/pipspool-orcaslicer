@@ -13,13 +13,13 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
-## Current release: 2.2.22
+## Current release: 2.2.23
 
-This update fixes field selection in Orca's PipSpool plugin menu: saved selections
-are passed in the expected format, host configuration changes update the checkboxes,
-and explicitly clearing the selection is respected. Shared-Filament and per-variant
-conflict protection are retained.
-See the [changelog](CHANGELOG.md#2222---2026-10-29).
+This update preserves custom-ID standalone profiles, corrects additional Orca
+serialized field formats, adds pressure-advance synchronization, and bounds the
+synchronization report with collapse and persistent clear controls. Shared-Filament
+and per-variant conflict protection are retained.
+See the [changelog](CHANGELOG.md#2223---2026-10-30).
 
 ## At a glance
 
@@ -71,7 +71,9 @@ one place:
   PipSpool-managed spool-ID output, including the configured command, when switched off.
 - A diagnostic pending-synchronization notice that identifies affected spools
   and changed fields, kept separate from the restart-required notice.
-- Last synchronization metrics, report and visible errors.
+- Last synchronization metrics and a scrollable, collapsible report with visible
+  errors and a persistent **Clear saved report** control. Clearing the report
+  leaves profiles, synchronization baselines and restart requirements intact.
 - A detailed change list showing which spool profiles and fields were updated.
 - Optional page visibility without disabling PipSpool's core synchronization.
 - Remaining-weight gauges, configurable low-filament warnings, duplicate-gate
@@ -121,7 +123,7 @@ dashboard appearance; selecting a theme does not synchronize or rename profiles.
 
 ### Manual installation
 
-1. Download `pipspool-2.2.22-py3-none-any.whl` from the
+1. Download `pipspool-2.2.23-py3-none-any.whl` from the
    [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
    The same wheel supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
    and macOS Apple Silicon. Select the wheel directly; do not unpack it or run pip.
@@ -247,7 +249,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.22 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.23 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is aligned with the public OrcaSlicer 2.5.0 Alpha
 Python-plugin metadata, lifecycle-event, hosted-page and background-worker APIs.
 Compatibility guards keep manual synchronization and the established fallback
@@ -277,6 +279,26 @@ are never automatically replayed. A new plugin identity or a different host may
 legitimately require approval. PipSpool does not edit or bypass Orca's grants.
 
 OrcaSlicer's Python plugin API is new and may change in future builds.
+
+## Pressure advance and custom filament IDs
+
+Under **Advanced field synchronization → Advanced**, select pressure advance and
+its enable option, plus any adaptive pressure-advance options you use. Save the
+selection and synchronize. Profiles with multiple extruder variants retain the
+matching values through companion fields; conflicting shared-sibling edits are
+preserved and reported. These fields are opt-in and do not configure your printer
+firmware or calibrate pressure advance automatically.
+
+Orca percentages, enum values and ramming text are decoded according to their
+field types. Disabled nullable filament overrides stay disabled; if such an
+override is present, PipSpool preserves that field across the shared group rather
+than guessing or enabling it. Malformed data still produces a preservation warning.
+
+A standalone profile with its own `filament_id` and empty `inherits` keeps its
+root identity during synchronization. This avoids Orca replacing that ID with a
+generic parent's ID. Spoolman spool-number matching and managed Start G-code are
+unchanged. The actual Filament ID Fixer/U1 workflow and the reported macOS build
+still need reporter confirmation; see issues #18 and #19 for remaining reports.
 
 ## Advanced setting scope and diagnostics
 
@@ -333,7 +355,7 @@ permission persistence limitations described above still apply.
 
 ## Privacy and release safety
 
-Version 2.2.22 uses one universal wheel of about 4 MB, with bundled artwork stored
+Version 2.2.23 uses one universal wheel of about 4 MB, with bundled artwork stored
 as separate local package resources. Release workflows validate the wheel's
 metadata, file hashes, source, artwork and upload size before creating a draft or
 contacting Orca Cloud. Packaging does not determine Orca Cloud's security rating;
