@@ -13,13 +13,13 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
-## Current release: 2.2.23
+## Current release: 2.2.24
 
-This update preserves custom-ID standalone profiles, corrects additional Orca
-serialized field formats, adds pressure-advance synchronization, and bounds the
-synchronization report with collapse and persistent clear controls. Shared-Filament
-and per-variant conflict protection are retained.
-See the [changelog](CHANGELOG.md#2223---2026-10-30).
+This update resolves sparse inherited variant values saved by Orca and makes
+Spoolman's single-value/legacy and per-variant fields clearer without deleting
+or converting their data. Shared-Filament and per-variant conflict protection
+remain intact.
+See the [changelog](CHANGELOG.md#2224---2026-10-31).
 
 ## At a glance
 
@@ -123,7 +123,7 @@ dashboard appearance; selecting a theme does not synchronize or rename profiles.
 
 ### Manual installation
 
-1. Download `pipspool-2.2.23-py3-none-any.whl` from the
+1. Download `pipspool-2.2.24-py3-none-any.whl` from the
    [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
    The same wheel supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
    and macOS Apple Silicon. Select the wheel directly; do not unpack it or run pip.
@@ -249,7 +249,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.23 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.24 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. It is aligned with the public OrcaSlicer 2.5.0 Alpha
 Python-plugin metadata, lifecycle-event, hosted-page and background-worker APIs.
 Compatibility guards keep manual synchronization and the established fallback
@@ -322,6 +322,29 @@ changes to any variant. Reordering the list does not move a value to another
 variant. Compatible changes to different variants merge; conflicting edits to
 the same variant are reported and preserved.
 
+Expand **Single values and per-variant values in Spoolman** in the dashboard or
+plugin-menu selector for an explanation. Save the field selection or synchronize
+to apply the updated Spoolman display names. Existing field keys, types, values,
+defaults, units and ordering are preserved; incompatible field types are reported
+without deletion or recreation.
+
+For example, flow ratio appears as:
+
+| Spoolman display name | Purpose |
+| --- | --- |
+| Filament: Filament Flow Ratio (single value / legacy) | One value for older profiles or when variants agree. It may be blank or retain an earlier value when variants differ. |
+| Filament Flow Ratio (per-variant values) | The existing Text field containing the JSON map matched to extruder variants; authoritative when those values differ. |
+
+A map containing `"legacy": null` has no retained single scalar value. Its
+per-variant values can still be present and synchronized. Keep both fields.
+
+Orca may save unchanged numeric/Boolean variant entries as `nil` placeholders.
+PipSpool resolves these from a known parent by extruder/variant identity before
+comparison, retaining explicit edits such as flow ratio 1.0053. Missing or
+ambiguous parent mappings are preserved and reported. This is separate from
+nullable filament retraction/ironing overrides, where `nil` means disabled and
+must stay disabled. No manual profile edits or field deletion are required.
+
 The original numeric Spoolman fields remain compatible. Additional Text fields
 `orca_filament_max_volumetric_speed__variants` and
 `orca_filament_flow_ratio__variants` store the versioned variant maps. Shared mode
@@ -355,7 +378,7 @@ permission persistence limitations described above still apply.
 
 ## Privacy and release safety
 
-Version 2.2.23 uses one universal wheel of about 4 MB, with bundled artwork stored
+Version 2.2.24 uses one universal wheel of about 4 MB, with bundled artwork stored
 as separate local package resources. Release workflows validate the wheel's
 metadata, file hashes, source, artwork and upload size before creating a draft or
 contacting Orca Cloud. Packaging does not determine Orca Cloud's security rating;

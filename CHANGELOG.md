@@ -2,6 +2,22 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.24] - 2026-10-31
+
+### Changes in 2.2.24
+
+- Resolve Orca's sparse saved variant values before synchronization. Unchanged numeric/Boolean variant entries stored as nil inherit from a known parent by extruder/variant identity; explicit decimal edits such as flow ratio 1.0053 are retained.
+- Keep disabled filament retraction/ironing overrides disabled. Missing or ambiguous parent mappings still preserve values and report a conflict instead of guessing.
+- Clarify Spoolman field pairs with “single value / legacy” and “per-variant values” display names. Existing field keys, types, values, defaults, units and ordering are preserved; incompatible types are reported without deletion or recreation.
+- Add an expandable explanation to the PipSpool dashboard and plugin-menu selector. A blank or retained legacy scalar is not the value for every variant when they differ; the companion map is authoritative. In that map, legacy: null does not mean the variant values are missing.
+- Apply the updated display names when saving the selected fields or synchronizing. Shared-Filament and per-variant conflict protection remain intact, including independent-spool mode.
+
+Both complete regression suites pass against the stable wheel. Coverage includes reordered parent mappings, decimal export and repeat sync, missing-parent preservation, sibling conflicts, metadata-only label updates and existing defaults. A local browser check covers the explanation and report controls.
+
+This fixes a source-verified sparse-inheritance case related to issue #19. The reporter's exact saved profile and macOS confirmation are still pending; this does not claim every synchronization report is resolved. No profile deletion or Spoolman field removal is required. If a problem remains, attach reviewed before/after Diagnostics, the exact warning and expected/actual values to the relevant issue. Issue #17's requested create-only mode is not included.
+
+Full history: https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md
+
 ## [2.2.23] - 2026-10-30
 
 ### Changes in 2.2.23
