@@ -33,7 +33,7 @@ def validate_payload(files):
         names = archive.namelist()
         if len(names) != len(set(names)):
             raise ValueError("Duplicate wheel paths")
-        assets = {name for name in names if re.fullmatch(r"pipspool/assets/[0-9a-f]{64}\.webp", name)}
+        assets = {name for name in names if re.fullmatch(r"pipspool/assets/a[0-9]{2}\.webp", name)}
         if len(assets) != 27 or set(names) != expected | assets:
             raise ValueError("Unexpected wheel contents or missing artwork")
         if sum(entry.file_size for entry in archive.infolist()) > MAX_PAYLOAD_BYTES:
@@ -66,8 +66,6 @@ def validate_payload(files):
             if name in assets:
                 if payload[:4] != b"RIFF" or payload[8:12] != b"WEBP":
                     raise ValueError("Invalid WebP resource")
-                if Path(name).stem != hashlib.sha256(payload).hexdigest():
-                    raise ValueError("Resource filename does not match content")
             if name.endswith(".py"):
                 source = payload.decode("utf-8")
                 ast.parse(source, filename=name)

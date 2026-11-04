@@ -2,6 +2,22 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.25] - 2026-11-04
+
+### Changes in 2.2.25
+
+- Add opt-in Create missing profiles only. New spool profiles are created while existing profiles, archive/duplicate cleanup, and advanced exports to Spoolman are skipped.
+- Add Preview sync for planned profile changes, Spoolman exports and conflicts. Preview performs no synchronization writes.
+- Show supported conflicting Orca/Spoolman values with an explicit choice of which value to use. Choices are rechecked against current conflict values at synchronization; unresolved or invalid mappings remain protected.
+- Add experimental tuning groups in Settings, disabled by default. Share selected advanced fields across matching brand/material records, optionally also matching product name and colour. Product and colour matching default on. Physical spool identity, colour, inventory and active spool commands remain separate.
+- Preserve differing existing Spoolman group values and report them for manual alignment. Group writes span several Filament records and are not a server transaction; an interrupted operation can require review before retrying.
+- Shorten bundled artwork filenames from 69 to 8 characters, reducing extracted image paths by 61 characters for portable installations. Artwork remains separate package resources. The reported portable Beta case still awaits confirmation.
+- Align Settings controls and simplify sharing/group descriptions.
+
+Both complete suites pass against the stable wheel: 117 private and 212 focused tests passed, with two development-only skips. One universal wheel supports all five platforms. Shared-Filament and per-variant conflict protection remain enabled. Reporter-specific Linux, U1 and saved-profile cases remain pending evidence or retesting.
+
+Full history: https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md
+
 ## [2.2.24] - 2026-10-31
 
 ### Changes in 2.2.24

@@ -13,13 +13,18 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
-## Current release: 2.2.24
+## Current release: 2.2.25
 
-This update resolves sparse inherited variant values saved by Orca and makes
-Spoolman's single-value/legacy and per-variant fields clearer without deleting
-or converting their data. Shared-Filament and per-variant conflict protection
-remain intact.
-See the [changelog](CHANGELOG.md#2224---2026-10-31).
+Preview synchronization and choose supported conflict values before applying changes.
+Use **Create missing profiles only** to keep existing profiles under your own control.
+
+Settings also includes optional **experimental tuning groups** for selected advanced
+fields across matching brands and materials, with product and colour filters.
+Differing Spoolman values require manual alignment before those fields can be grouped.
+Each spool retains its identity and inventory.
+
+Bundled artwork uses shorter filenames to reduce path length in portable installations.
+See the [changelog](CHANGELOG.md#2225---2026-11-04).
 
 ## At a glance
 
@@ -36,7 +41,7 @@ See the [changelog](CHANGELOG.md#2224---2026-10-31).
   and the existing dashboard off switch.
 - Optional synchronization for selected fields across every Orca filament tab.
 - Bidirectional advanced-field updates: one-sided Spoolman changes can update
-  Orca, while Orca remains master if both sides changed differently.
+  Orca. Conflicting edits are preserved for review and supported conflicts can be resolved explicitly through Preview sync.
 - Shared Spoolman Filament values propagate across all associated physical-spool
   profiles without silently overwriting conflicting sibling edits.
 - Native Spoolman field types and units for temperatures, percentages, numbers,
