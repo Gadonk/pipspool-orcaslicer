@@ -13,18 +13,17 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
-## Current release: 2.2.25
+## Current release: 2.2.26
 
-Preview synchronization and choose supported conflict values before applying changes.
-Use **Create missing profiles only** to keep existing profiles under your own control.
+On OrcaSlicer 2.5.0 RC, PipSpool groups supported settings-file, background-thread
+and saved Spoolman-host requests into one approval dialog. Older plugin builds
+retain their compatible first-use permission flow.
 
-Settings also includes optional **experimental tuning groups** for selected advanced
-fields across matching brands and materials, with product and colour filters.
-Differing Spoolman values require manual alignment before those fields can be grouped.
-Each spool retains its identity and inventory.
-
-Bundled artwork uses shorter filenames to reduce path length in portable installations.
-See the [changelog](CHANGELOG.md#2225---2026-11-04).
+This release also cleans up the Python runtime, build code and embedded
+JavaScript/CSS. Local testing confirmed combined approval and persistence after
+restarting Orca. Permission persistence across plugin updates is still awaiting
+a real update test.
+See the [changelog](CHANGELOG.md#2226---2026-11-05).
 
 ## At a glance
 
@@ -47,6 +46,20 @@ See the [changelog](CHANGELOG.md#2225---2026-11-04).
 - Native Spoolman field types and units for temperatures, percentages, numbers,
   booleans and supported choices.
 - No slicer-side filament deduction and no duplicate process profiles.
+
+## Synchronization choices
+
+Use **Preview sync** to review planned profile changes, Spoolman exports and
+supported conflict choices. Synchronization checks those values again before
+applying a selected choice.
+
+Enable **Create missing profiles only** in Settings to add new spool profiles
+while skipping updates to existing profiles and advanced exports to Spoolman.
+
+**Experimental tuning groups** can share selected advanced fields across matching
+brands and materials. Product-name and colour matching start enabled.
+Differing existing Spoolman values require manual alignment before those fields
+can be grouped. Each spool retains its own identity and inventory.
 
 ## PipSpool dashboard
 
@@ -254,26 +267,28 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.24 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
-and macOS Apple Silicon. It is aligned with the public OrcaSlicer 2.5.0 Alpha
-Python-plugin metadata, lifecycle-event, hosted-page and background-worker APIs.
-Compatibility guards keep manual synchronization and the established fallback
-behavior available on older Orca plugin builds.
+PipSpool 2.2.26 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+and macOS Apple Silicon. Use OrcaSlicer 2.5.0 RC for consolidated permission
+requests. Compatibility guards retain manual synchronization and the existing
+first-use permission flow on older plugin-capable builds.
 
-OrcaSlicer 2.5 may ask once for permission when PipSpool creates a background
-worker. If permission is denied, PipSpool now reports a recoverable message:
-approve the request and repeat the action. PipSpool never edits or bypasses
-OrcaSlicer's saved permission decisions.
+On RC, the approval dialog can appear during plugin loading and combine the
+settings-file read, background-thread access and saved Spoolman host. A fresh
+installation has no saved server to declare; configuring and contacting that
+server may therefore need an additional approval. Orca stores approved grants.
+Restart persistence has been confirmed locally; persistence across plugin
+updates is still awaiting a real update test.
+
+Orca's host-based network permissions are documented in
+[PR #16690](https://github.com/OrcaSlicer/OrcaSlicer/pull/16690).
+A host grant covers the server's API paths and targetless network events.
+Different destinations and external browser actions can require separate consent.
 
 Linux/WebKit Settings-window reload recovery requires an Orca build containing
-[OrcaSlicer PR #15737](https://github.com/OrcaSlicer/OrcaSlicer/pull/15737).
-PipSpool does not eagerly request access to installation-specific Python IDNA
-files at startup; this avoids an unstable Linux AppImage permission target.
-Orca fixed the recurring network permission prompt across restarts in
-[PR #16658](https://github.com/OrcaSlicer/OrcaSlicer/pull/16658), merged as
-`6626377` on 20 October 2026. Use an Orca build containing that fix; nightly
-`069bd402` includes it, while the original 2.5.0 Alpha release predates it.
-PipSpool alone cannot fix the host permission system in older Orca builds.
+[PR #15737](https://github.com/OrcaSlicer/OrcaSlicer/pull/15737).
+Earlier network-permission fixes are tracked in
+[PR #16658](https://github.com/OrcaSlicer/OrcaSlicer/pull/16658).
+Older Orca builds may lack these host-side fixes.
 
 PipSpool distinguishes a denied network operation from a disconnected server.
 If Orca refuses an attempt while posting an approval prompt, approve the trusted
@@ -373,7 +388,7 @@ and G-code. Collect reports before and after a suspected reset; after-only data
 cannot recover the preceding values. Historical error logs are not included.
 
 The first dashboard connection uses a real read-only request through Orca's UI
-callback so the released alpha can show its permission prompts. If refused, use
+callback so older builds can show their permission prompts. If refused, use
 **Allow connection** to retry explicitly. Automatic attempts pause after denial.
 The first request may pause the interface while the server responds or you answer
 an approval prompt. After a successful read, spools appear and profile checks
@@ -383,7 +398,7 @@ permission persistence limitations described above still apply.
 
 ## Privacy and release safety
 
-Version 2.2.24 uses one universal wheel of about 4 MB, with bundled artwork stored
+Version 2.2.26 uses one universal wheel of about 4 MB, with bundled artwork stored
 as separate local package resources. Release workflows validate the wheel's
 metadata, file hashes, source, artwork and upload size before creating a draft or
 contacting Orca Cloud. Packaging does not determine Orca Cloud's security rating;

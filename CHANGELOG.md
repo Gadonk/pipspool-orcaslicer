@@ -2,6 +2,25 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.26] - 2026-11-05
+
+### Changes in 2.2.26
+
+- Group supported settings-file, background-thread and saved Spoolman-host permission requests into one approval dialog on OrcaSlicer 2.5.0 RC.
+- Keep compatibility with older permission APIs through the existing filesystem declaration and first-use network/thread flow.
+- Declare only the configured Spoolman host. Credentials, URL paths, queries and ports are excluded from the host target; a fresh configuration does not request access to the default server automatically.
+- Keep plugin registration free of network requests, worker startup and settings migration. Declined operations retain their explicit retry handling.
+- Clean up Python runtime and build code, remove unused calculations, and give shared-group/individual-spool writers explicit state.
+- Format embedded JavaScript and CSS in the dashboard, Settings and field selector. Preserve the existing controls and synchronization behavior.
+
+Local testing confirmed the combined permission dialog and persistence after restarting Orca. Approval may still appear during startup. Configuring a new server, contacting another destination or changing plugin identity can require another approval. Permission persistence across plugin updates is still awaiting a real update test.
+
+Both complete regression suites pass against the stable wheel: 117 private and 218 focused tests passed, with two development-only skips. Browser checks cover dashboard rendering, sync preview and conflict-choice submission; the formatted JavaScript syntax trees were compared. A complete Orca smoke test after UI cleanup remains pending.
+
+One universal wheel supports Windows x86-64, Linux x86-64/ARM64 and macOS Intel/Apple Silicon. Artwork remains separate package resources. The optional tuning groups introduced in 2.2.25 remain experimental.
+
+Full history: https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md
+
 ## [2.2.25] - 2026-11-04
 
 ### Changes in 2.2.25
