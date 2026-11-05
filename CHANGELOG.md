@@ -2,6 +2,24 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.27] - 2026-11-05
+
+### Changes in 2.2.27
+
+- Preserve a standalone profile's valid custom filament ID when its saved JSON omits the inherits field. This extends the earlier explicit-empty-inheritance fix and matches Orca RC's handling of parentless profiles. Profiles without a valid custom ID and profiles with explicit nonempty inheritance retain their established parenting.
+- Disable Cleanup in individual-spool and Create missing profiles only modes, including after refresh and background operations finish. Explain that unchecking a field stops synchronization, while Cleanup permanently deletes unselected shared Filament definitions and their values.
+- Retain the RC-compatible combined permission requests and Python/UI cleanup from 2.2.26.
+
+The custom-ID fix covers a reproduced, source-verified case related to issue #18. Confirmation with the reporter's actual Filament ID Fixer/U1 workflow is still pending.
+
+The Cleanup control fix addresses one part of issue #17. Its remaining volumetric-speed conflicts still need the requested warning and saved-profile evidence. This release does not broadcast one scalar over distinct extruder variants or relax conflict protection. Issue #19 also remains awaiting profile evidence.
+
+Both complete suites pass against the stable wheel: 117 private and 224 focused tests passed, with two development-only skips. Coverage includes repeated custom-ID sync, unrelated-field preservation, ordinary parenting, and Cleanup mode/busy-state transitions. Manual reporter testing remains pending.
+
+One universal wheel supports Windows x86-64, Linux x86-64/ARM64 and macOS Intel/Apple Silicon. Artwork remains separate package resources.
+
+Full history: https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md
+
 ## [2.2.26] - 2026-11-05
 
 ### Changes in 2.2.26
