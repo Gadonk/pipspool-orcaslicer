@@ -2,6 +2,27 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.28] - 2026-11-09
+
+### Changes in 2.2.28
+
+- Keep saved Orca bed temperatures by default and inherit missing plate values. Add Settings > Bed temperatures > Use Spoolman for all plates as an optional override, disabled for new and existing configurations. Selected advanced plate fields still synchronize with conflict protection.
+- Preserve resolved variant layouts when saving inherited tuning, including supported same-parent packed presets. Keep values unchanged when the parent, layout or writable mapping is ambiguous.
+- Protect imported variant values from being exported back as the preceding loaded Orca value during a repeat sync.
+- Retain affected baselines after failed or partial Orca profile saves and block ambiguous outbound retries, including overlapping tuning scopes. Independent successful profiles can continue; completed server writes are not rolled back.
+- Show the reason a variant field was preserved in the dashboard, including conflicting edits, scalar/map ambiguity and invalid mappings.
+- Add experimental Bambu Studio JSON export, disabled by default. Use a matching standalone Studio template, keep its tuning, and optionally apply a range-checked Spoolman nozzle temperature. Stable export identity supports repeated exports for the same server/spool/printer. Bambu Studio owns import and cloud synchronization; PipSpool does not connect directly to Bambu Cloud.
+
+Previously flattened bed temperatures need manual restoration in Orca; existing saved values are not deleted or guessed. Turning the all-plate option off prevents further blanket updates but does not undo earlier ones.
+
+A Bambu Studio same-name import updated the local test preset, while a native Studio edit/save was needed to queue its cloud update. Cloud read-back and printer-touchscreen availability remain unverified.
+
+Both complete suites pass against the stable wheel: 117 private and 255 focused tests passed, with two development-only skips. The development source passes all 374 tests. Shared-Filament, per-variant and custom-ID protection remain enabled. Live Orca testing and reporter-specific confirmation for issues #17, #18, #19 and #22 remain pending; these reports are not claimed fully resolved.
+
+One universal wheel supports Windows x86-64, Linux x86-64/ARM64 and macOS Intel/Apple Silicon, with separate artwork resources and the MIT license.
+
+Full history: https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md
+
 ## [2.2.27] - 2026-11-05
 
 ### Changes in 2.2.27

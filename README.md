@@ -13,19 +13,22 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
-## Current release: 2.2.27
+## Current release: 2.2.28
 
-This bug-fix update preserves custom filament IDs in standalone profiles that
-omit the inheritance field. It also makes Cleanup availability clear in
-individual-spool and create-only modes.
+Orca's plate-specific bed temperatures are now kept by default. Settings offers
+an optional Spoolman override for all plates; selected advanced plate fields
+continue to synchronize. Existing temperatures are preserved, so values flattened
+by an earlier version need to be restored manually in Orca.
 
-The remaining volumetric-speed conflict in issue #17 is still under
-investigation. Actual U1/Filament ID Fixer confirmation for issue #18 is pending.
-See the [changelog](CHANGELOG.md#2227---2026-11-05).
+This release also improves inherited extruder-variant saves, protects repeat
+synchronization and failed-save retries, explains variant conflicts more clearly,
+and adds an experimental Bambu Studio export. See the
+[changelog](CHANGELOG.md#2228---2026-11-09).
 
-The RC-compatible combined permission requests introduced in 2.2.26 are
-included. Local testing confirmed approval persists after restarting Orca;
-permission persistence across plugin updates still needs a real update test.
+Reporter-specific cases in issues #17, #18 and #19 still need confirmation or
+profile evidence. The existing RC-compatible permission flow remains included;
+restart persistence was confirmed locally, while update persistence still needs
+a real update test.
 
 ## At a glance
 
@@ -36,7 +39,8 @@ permission persistence across plugin updates still needs a real update test.
 - Automatic removal of the matching profile when a spool is archived.
 - Configurable profile naming, with `(#42) PLA Galaxy Blue - Manufacturer - PipSpool`
   retained as the default and a mandatory spool ID for safe matching.
-- Nozzle and bed temperatures imported from the correct Spoolman material.
+- Nozzle temperatures imported from Spoolman; saved Orca bed temperatures kept
+  by default, with an optional all-plate Spoolman override.
 - Configurable spool-ID command with `{spool_id}` substitution, retaining
   `SET_ACTIVE_SPOOL ID={spool_id}` as the default, optional per-spool Start G-code,
   and the existing dashboard off switch.
@@ -62,6 +66,39 @@ while skipping updates to existing profiles and advanced exports to Spoolman.
 brands and materials. Product-name and colour matching start enabled.
 Differing existing Spoolman values require manual alignment before those fields
 can be grouped. Each spool retains its own identity and inventory.
+
+## Bed temperatures
+
+In **PipSpool Settings → Bed temperatures**, leave **Use Spoolman for all plates**
+off to keep saved Orca values and inherit missing values from the profile's
+portable material parent. This preserves different cool/hot plate temperatures
+and any inherited zero that marks an unsupported plate. A portable parent may
+differ from a printer-specific preset.
+
+Turn the option on only when you want Spoolman's single Bed Temp applied to
+every plate and both layer settings. To synchronize particular plates instead,
+leave it off and select those advanced plate-temperature fields. Selected
+advanced values and conflict protection take precedence in either mode.
+
+Turning the option off does not remove earlier saved overrides. Restore any
+previously flattened values manually in Orca using the appropriate material,
+parent and extruder variant. Nozzle-temperature synchronization is unchanged.
+
+## Experimental Bambu Studio export
+
+Enable experimental Bambu Studio export in PipSpool Settings to add an export
+action to each spool row. Supply an absolute path to a standalone Custom
+Filament JSON saved in Bambu Studio's user preset folder for the same material
+and exact printer/nozzle. Enter an output `.json` path in an existing folder.
+Template tuning is kept; Spoolman's nozzle temperature is an optional,
+range-checked override. The export keeps a stable identity for the same
+Spoolman server, spool and target printer.
+
+Import the JSON in Bambu Studio. PipSpool does not sign in to Bambu Cloud or
+write directly to it. A same-name reimport may only update the local preset;
+Bambu Studio's native edit/save was needed to queue a cloud update in local
+testing. Cloud read-back and availability on the printer touchscreen remain
+unverified. This feature is disabled by default.
 
 ## PipSpool dashboard
 
@@ -103,8 +140,9 @@ one place:
 - Deliberate cleanup controls for obsolete PipSpool fields.
 
 Advanced field synchronization is opt-in. No advanced fields are selected by
-default, and ordinary spool details, temperatures and spool-ID G-code continue
-to work without enabling it. List-valued dependency settings such as Compatible
+default. Ordinary spool details, Spoolman nozzle temperatures and spool-ID
+G-code work without enabling it. Bed temperatures follow the separate choice
+in Settings. List-valued dependency settings such as Compatible
 Printers and Compatible Prints retain their full values in both directions.
 
 ## Dashboard themes
@@ -143,7 +181,7 @@ dashboard appearance; selecting a theme does not synchronize or rename profiles.
 
 ### Manual installation
 
-1. Download `pipspool-2.2.24-py3-none-any.whl` from the
+1. Download `pipspool-2.2.28-py3-none-any.whl` from the
    [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
    The same wheel supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
    and macOS Apple Silicon. Select the wheel directly; do not unpack it or run pip.
@@ -175,12 +213,15 @@ Generated profiles use this order by default:
 
 ### Synchronize one spool
 
-Select **Sync** beside an active spool. With no advanced fields selected, only
-that spool is synchronized. With advanced fields enabled, the confirmation
-explains that all active profiles sharing its Spoolman Filament are reconciled
-together, preserving sibling conflict protection. Unrelated Filaments are left
-unchanged. Use **Synchronize now** for the full inventory and archived-profile
-cleanup. The last synchronization report lists the checked scope and changes.
+Select **Sync** beside an active spool. The checked scope follows Settings:
+independent mode checks that spool; shared mode also reconciles its active
+Filament siblings when advanced fields are selected; experimental tuning groups
+check matching active spools across Filament records. Without a group or selected
+advanced fields, only the chosen spool is checked. Preview and the report show
+the affected scope.
+
+Use **Synchronize now** for the full inventory and archived-profile cleanup.
+Unrelated profiles remain unchanged.
 
 ### Choose the spool-ID command
 
@@ -248,8 +289,8 @@ are preserved with a visible error instead of being overwritten.
 PipSpool preserves unrelated Orca-specific profile adjustments. Advanced-field
 synchronization remembers the last agreed value so it can identify which side
 changed. A one-sided Spoolman edit is imported into Orca; a one-sided Orca edit
-is exported to Spoolman. If both sides changed differently, Orca remains the
-master.
+is exported to Spoolman. If both sides changed differently, both values are
+preserved for review. Use Preview sync to choose a supported resolution.
 
 ## Features I’m working on
 
@@ -269,9 +310,9 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.27 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
-and macOS Apple Silicon. Use OrcaSlicer 2.5.0 RC for consolidated permission
-requests. Compatibility guards retain manual synchronization and the existing
+PipSpool 2.2.28 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+and macOS Apple Silicon. Use OrcaSlicer 2.5.0 or a compatible RC build for
+consolidated permission requests. Compatibility guards retain manual synchronization and the existing
 first-use permission flow on older plugin-capable builds.
 
 On RC, the approval dialog can appear during plugin loading and combine the
@@ -316,16 +357,16 @@ field types. Disabled nullable filament overrides stay disabled; if such an
 override is present, PipSpool preserves that field across the shared group rather
 than guessing or enabling it. Malformed data still produces a preservation warning.
 
-A standalone profile with its own `filament_id` and empty `inherits` keeps its
-root identity during synchronization. This avoids Orca replacing that ID with a
-generic parent's ID. Spoolman spool-number matching and managed Start G-code are
+A standalone profile with its own `filament_id` and empty or omitted `inherits`
+keeps its root identity during synchronization. This avoids Orca replacing that
+ID with a generic parent's ID. Spoolman spool-number matching and managed Start G-code are
 unchanged. The actual Filament ID Fixer/U1 workflow and the reported macOS build
 still need reporter confirmation; see issues #18 and #19 for remaining reports.
 
 ## Advanced setting scope and diagnostics
 
-Open **Settings → Advanced setting scope** to choose shared Filament settings
-(the default) or independent settings for each spool. Shared mode propagates
+Open **Settings → Advanced settings → Share settings** to choose shared Filament
+settings (the default) or independent settings for each spool. Shared mode propagates
 selected values to sibling profiles using the same Spoolman Filament. Independent
 mode stores selected values on each Spoolman spool. Returning to shared mode with
 differing sibling values reports a conflict rather than choosing a silent winner.
@@ -343,6 +384,16 @@ with their extruder variants. PipSpool preserves this mapping and synchronizes
 changes to any variant. Reordering the list does not move a value to another
 variant. Compatible changes to different variants merge; conflicting edits to
 the same variant are reported and preserved.
+
+Inherited variant changes are saved with their resolved layout. Missing,
+ambiguous or changed-parent mappings preserve the affected values and explain
+the conflict rather than guessing. After an import, repeated syncs protect
+against Orca still exposing the preceding loaded value.
+
+If saving an Orca profile fails, the affected fields keep their previous
+baseline and block ambiguous outbound retries while unrelated successful
+profiles can continue. Completed Spoolman writes are not rolled back; review
+the report before retrying, and restart Orca when prompted to load saved presets.
 
 Expand **Single values and per-variant values in Spoolman** in the dashboard or
 plugin-menu selector for an explanation. Save the field selection or synchronize
@@ -400,7 +451,7 @@ permission persistence limitations described above still apply.
 
 ## Privacy and release safety
 
-Version 2.2.27 uses one universal wheel of about 4 MB, with bundled artwork stored
+Version 2.2.28 uses one universal wheel of about 4 MB, with bundled artwork stored
 as separate local package resources. Release workflows validate the wheel's
 metadata, file hashes, source, artwork and upload size before creating a draft or
 contacting Orca Cloud. Packaging does not determine Orca Cloud's security rating;
