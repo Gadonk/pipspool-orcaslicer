@@ -2,6 +2,27 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.29] - 2026-11-09
+
+### Changes in 2.2.29
+
+- Add English, German, French, Spanish and Brazilian Portuguese interface text. Follow Orca's interface language by default, with a saved manual override in Settings and an English fallback for unsupported or unavailable host languages.
+- Translate dashboard controls, Settings, field selection, diagnostics controls, sync preview and the experimental Bambu export form. Preserve user-entered names, profile identity, field keys, G-code, conflict tokens and canonical diagnostic/report data. Raw exception details and technical examples can remain English.
+- Adjust narrow dashboard layouts for longer labels and give the active-spool G-code switch its own space.
+- Add an icon-only coffee-Pip support button beside Feedback. Clicking opens the fixed Ko-fi page in the system browser. Opening or refreshing PipSpool makes no Ko-fi request.
+- Run the automatic initial inventory read in the background on hosts supporting the combined permission API. Keep the UI read for older builds and explicit Allow connection recovery. Publish inventory before profile checks finish and ignore delayed replies from a previously configured server.
+- Point OrcaSlicer 2.5.0 permission recovery to Plugins > Permissions, distinguish thread and network denial, and retain deliberate retries after approval.
+
+Shared-Filament, per-variant and custom-ID safeguards remain enabled. The bed-temperature ownership choices and optional experimental exports from 2.2.28 are retained. This release does not claim to resolve the reporter-specific cases in issues #17, #18, #19 or #22.
+
+Both complete suites pass against the stable wheel: 117 private and 307 focused tests passed, with two development-only skips. The development source passes 117 private and 309 focused tests without skips. Browser checks cover all five languages across five UI surfaces at desktop and narrow widths using a mocked Orca bridge. No JavaScript errors or external requests were observed in those checks.
+
+Native Orca installation, restart/update permissions, actual server timings and native-speaker wording review remain pending. Earlier RC restart approval persistence was confirmed locally. Automated browser timings are not a measured native Orca speedup.
+
+One universal wheel supports Windows x86-64, Linux x86-64/ARM64 and macOS Intel/Apple Silicon, with 28 separate artwork resources, five bundled translation catalogs and the MIT license.
+
+Full history: https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md
+
 ## [2.2.28] - 2026-11-09
 
 ### Changes in 2.2.28

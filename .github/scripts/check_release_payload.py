@@ -1,10 +1,12 @@
 """Validate the stable universal wheel before draft creation or Cloud upload."""
 import ast
 import base64
+from collections import Counter
 import csv
 from email.parser import BytesParser
 import hashlib
 import io
+import json
 from pathlib import Path, PurePosixPath
 import re
 import sys
@@ -12,6 +14,57 @@ import zipfile
 
 MAX_PAYLOAD_BYTES = 50_000_000
 MULTIPART_ALLOWANCE_BYTES = 64 * 1024
+BUNDLED_ARTWORK_COUNT = 28
+BUNDLED_LOCALES = ("en", "de", "fr", "es", "pt_BR")
+PLACEHOLDERS = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def literal_manifest(tree, name):
+    values = [
+        node.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == name
+                for target in node.targets)
+    ]
+    if len(values) != 1:
+        raise ValueError(f"Expected one {name} manifest")
+    try:
+        return ast.literal_eval(values[0])
+    except (ValueError, TypeError) as error:
+        raise ValueError(f"Invalid {name} manifest") from error
+
+
+def catalog_pairs(pairs):
+    catalog = {}
+    for key, value in pairs:
+        if key in catalog:
+            raise ValueError("Duplicate locale key")
+        catalog[key] = value
+    return catalog
+
+
+def validate_catalogs(archive):
+    english = None
+    for locale in BUNDLED_LOCALES:
+        name = f"pipspool/locales/{locale}.json"
+        try:
+            catalog = json.loads(archive.read(name).decode("utf-8"),
+                                 object_pairs_hook=catalog_pairs)
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError(f"Invalid UTF-8 JSON catalog: {locale}") from error
+        if not isinstance(catalog, dict) or not catalog or any(
+            not isinstance(key, str) or not isinstance(value, str)
+            for key, value in catalog.items()
+        ):
+            raise ValueError(f"Locale must contain a flat string dictionary: {locale}")
+        if english is None:
+            english = set(catalog)
+        elif set(catalog) != english:
+            raise ValueError(f"Locale keys differ from English: {locale}")
+        for key, value in catalog.items():
+            if Counter(PLACEHOLDERS.findall(key)) != Counter(PLACEHOLDERS.findall(value)):
+                raise ValueError(f"Locale placeholders differ: {locale}")
 
 
 def validate_payload(files):
@@ -29,13 +82,15 @@ def validate_payload(files):
     info = f"pipspool-{version}.dist-info"
     expected = {"pipspool/__init__.py", "pipspool/artwork.py",
                 f"{info}/METADATA", f"{info}/WHEEL", f"{info}/RECORD", f"{info}/top_level.txt", f"{info}/LICENSE"}
+    assets = {f"pipspool/assets/a{index:02d}.webp"
+              for index in range(BUNDLED_ARTWORK_COUNT)}
+    catalogs = {f"pipspool/locales/{locale}.json" for locale in BUNDLED_LOCALES}
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()
         if len(names) != len(set(names)):
             raise ValueError("Duplicate wheel paths")
-        assets = {name for name in names if re.fullmatch(r"pipspool/assets/a[0-9]{2}\.webp", name)}
-        if len(assets) != 27 or set(names) != expected | assets:
-            raise ValueError("Unexpected wheel contents or missing artwork")
+        if set(names) != expected | assets | catalogs:
+            raise ValueError("Unexpected wheel contents or missing package resources")
         if sum(entry.file_size for entry in archive.infolist()) > MAX_PAYLOAD_BYTES:
             raise ValueError("Uncompressed wheel exceeds safety budget")
         for name in names:
@@ -51,6 +106,7 @@ def validate_payload(files):
             raise ValueError("Wheel is not pure Python and universal")
         if archive.read(f"{info}/top_level.txt").strip() != b"pipspool":
             raise ValueError("Incorrect entry package")
+        validate_catalogs(archive)
         rows = list(csv.reader(io.StringIO(archive.read(f"{info}/RECORD").decode("utf-8"))))
         if len(rows) != len(names) or {row[0] for row in rows} != set(names):
             raise ValueError("Incomplete wheel RECORD")
@@ -72,6 +128,13 @@ def validate_payload(files):
                 if "-dev" in source or "192.168.0.3" in source:
                     raise ValueError("Development data in stable source")
         source = archive.read("pipspool/__init__.py").decode("utf-8")
+        tree = ast.parse(source)
+        count = literal_manifest(tree, "BUNDLED_ARTWORK_COUNT")
+        locales = literal_manifest(tree, "BUNDLED_LOCALES")
+        if type(count) is not int or count != BUNDLED_ARTWORK_COUNT:
+            raise ValueError("Artwork manifest does not match package resources")
+        if type(locales) is not tuple or locales != BUNDLED_LOCALES:
+            raise ValueError("Locale manifest does not match package resources")
         if f'PLUGIN_VERSION = "{version}"' not in source or f'# version = "{version}"' not in source:
             raise ValueError("Runtime version mismatch")
         if 'DEFAULT_SPOOLMAN_URL = "http://localhost:7912"' not in source:

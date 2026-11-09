@@ -13,22 +13,22 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
-## Current release: 2.2.28
+## Current release: 2.2.29
 
-Orca's plate-specific bed temperatures are now kept by default. Settings offers
-an optional Spoolman override for all plates; selected advanced plate fields
-continue to synchronize. Existing temperatures are preserved, so values flattened
-by an earlier version need to be restored manually in Orca.
+PipSpool now offers English, German, French, Spanish and Brazilian Portuguese.
+It follows OrcaSlicer's interface language by default, with a manual choice in
+Settings and an English fallback. Longer labels fit narrow dashboard windows.
 
-This release also improves inherited extruder-variant saves, protects repeat
-synchronization and failed-save retries, explains variant conflicts more clearly,
-and adds an experimental Bambu Studio export. See the
-[changelog](CHANGELOG.md#2228---2026-11-09).
+Hosts with the combined permission API now load the initial Spoolman inventory
+in the background. Permission recovery guidance covers OrcaSlicer 2.5.0, and late
+responses from a previously selected server are ignored. A new coffee-Pip icon
+beside Feedback opens Donko's Ko-fi page when clicked. See the
+[changelog](CHANGELOG.md#2229---2026-11-09).
 
-Reporter-specific cases in issues #17, #18 and #19 still need confirmation or
-profile evidence. The existing RC-compatible permission flow remains included;
-restart persistence was confirmed locally, while update persistence still needs
-a real update test.
+Native Orca installation, connection timings and permission persistence across
+updates still need testing. Earlier RC restart persistence was confirmed
+locally. Reporter-specific cases in issues #17, #18, #19 and #22 still need
+confirmation or profile evidence.
 
 ## At a glance
 
@@ -52,6 +52,8 @@ a real update test.
 - Native Spoolman field types and units for temperatures, percentages, numbers,
   booleans and supported choices.
 - No slicer-side filament deduction and no duplicate process profiles.
+- Five interface languages, automatic Orca language selection and a saved manual
+  override.
 
 ## Synchronization choices
 
@@ -124,6 +126,8 @@ one place:
   reported by Spoolman.
 - **Feedback**, **Refresh** and **Synchronize now** actions, plus a **Sync**
   button beside each active spool.
+- An icon-only coffee-Pip support button beside **Feedback**, with a tooltip and
+  keyboard focus indicator.
 - A prominent **Active spool G-code** toggle that is enabled by default and removes
   PipSpool-managed spool-ID output, including the configured command, when switched off.
 - A diagnostic pending-synchronization notice that identifies affected spools
@@ -144,6 +148,23 @@ default. Ordinary spool details, Spoolman nozzle temperatures and spool-ID
 G-code work without enabling it. Bed temperatures follow the separate choice
 in Settings. List-valued dependency settings such as Compatible
 Printers and Compatible Prints retain their full values in both directions.
+
+The coffee-Pip button opens Donko's support page in your system browser.
+Opening or refreshing the dashboard does not contact Ko-fi. [Support PipSpool](https://ko-fi.com/gadonk)
+
+## Interface language
+
+Open **PipSpool Settings → Language** to choose **English**, **Deutsch**,
+**Français**, **Español** or **Português (Brasil)**. The default, **Use OrcaSlicer
+language (automatic)**, follows Orca's interface language when the host provides
+it. Unsupported languages and older hosts without language information use
+English. A manual choice is saved independently of Orca's language.
+
+After saving, reopen PipSpool windows or use **Refresh** on the dashboard to apply
+the language. Labels, dialogs and reports use bundled translations. Spool and
+profile names, user-entered values, field identifiers, G-code, conflict identifiers,
+selected values and exported diagnostic data retain their original content. Raw exception
+details and technical examples can remain in English.
 
 ## Dashboard themes
 
@@ -181,7 +202,7 @@ dashboard appearance; selecting a theme does not synchronize or rename profiles.
 
 ### Manual installation
 
-1. Download `pipspool-2.2.28-py3-none-any.whl` from the
+1. Download `pipspool-2.2.29-py3-none-any.whl` from the
    [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
    The same wheel supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
    and macOS Apple Silicon. Select the wheel directly; do not unpack it or run pip.
@@ -310,17 +331,23 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.28 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.29 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. Use OrcaSlicer 2.5.0 or a compatible RC build for
-consolidated permission requests. Compatibility guards retain manual synchronization and the existing
-first-use permission flow on older plugin-capable builds.
+consolidated permission requests and automatic background inventory loading.
+Compatibility guards retain manual synchronization and the existing first-use
+permission flow on older plugin-capable builds.
 
-On RC, the approval dialog can appear during plugin loading and combine the
+On supported hosts, the approval dialog can appear during plugin loading and combine the
 settings-file read, background-thread access and saved Spoolman host. A fresh
 installation has no saved server to declare; configuring and contacting that
 server may therefore need an additional approval. Orca stores approved grants.
-Restart persistence has been confirmed locally; persistence across plugin
-updates is still awaiting a real update test.
+Restart persistence was confirmed locally on RC. Installation, restart and
+update behavior for this release still need native Orca testing.
+
+In OrcaSlicer 2.5.0, open **Plugins → Permissions** and select PipSpool to review
+the saved Spoolman-host and background-thread access. After changing a grant,
+retry the action. Older hosts use permission prompts. Only approve destinations
+you trust.
 
 Orca's host-based network permissions are documented in
 [PR #16690](https://github.com/OrcaSlicer/OrcaSlicer/pull/16690).
@@ -440,22 +467,28 @@ omit raw logs, credentials, server addresses, paths, profile names, original IDs
 and G-code. Collect reports before and after a suspected reset; after-only data
 cannot recover the preceding values. Historical error logs are not included.
 
-The first dashboard connection uses a real read-only request through Orca's UI
-callback so older builds can show their permission prompts. If refused, use
-**Allow connection** to retry explicitly. Automatic attempts pause after denial.
-The first request may pause the interface while the server responds or you answer
-an approval prompt. After a successful read, spools appear and profile checks
-continue in the background. Timing details are written to the local PipSpool log.
-This does not require a PR test build or bypass Orca's permissions; older-host
-permission persistence limitations described above still apply.
+Opening the dashboard automatically reads the Spoolman inventory. On hosts with
+the supported combined permission API, the read runs in the background. Spools
+appear before profile checks finish. Responses from a previously configured
+server are ignored so they cannot replace the current inventory or export data.
+
+Older hosts and the explicit **Allow connection** action use a real read-only
+request through Orca's UI callback so permission prompts can appear. That path
+may pause the interface while the server responds or you answer a prompt.
+Automatic attempts pause after a denial, and the connection panel distinguishes
+network access from background-thread refusal. Review the permission, then retry
+explicitly. Timing details remain in the local PipSpool log. Actual connection
+times depend on the server and still need native Orca measurement.
 
 ## Privacy and release safety
 
-Version 2.2.28 uses one universal wheel of about 4 MB, with bundled artwork stored
-as separate local package resources. Release workflows validate the wheel's
-metadata, file hashes, source, artwork and upload size before creating a draft or
-contacting Orca Cloud. Packaging does not determine Orca Cloud's security rating;
-that rating comes from Orca Cloud's own review.
+Version 2.2.29 uses one universal wheel of about 4 MB, with bundled artwork and
+five translation catalogs stored as separate local package resources. Interface
+translation uses these bundled files without an external translation service.
+Release workflows validate the wheel's metadata, file hashes, source, resources
+and upload size before creating a draft or contacting Orca Cloud. Packaging does
+not determine Orca Cloud's security rating; that rating comes from Orca Cloud's
+own review.
 
 PipSpool synchronizes with the Spoolman address saved in its settings. Its
 installed-version notice also checks the public GitHub release API. The public
