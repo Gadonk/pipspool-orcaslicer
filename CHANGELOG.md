@@ -2,6 +2,19 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.31] - 2026-11-13
+
+### Changes in 2.2.31
+
+- Move **Sync direction** next to **Active spool G-code** in **Printer Gates/Toolheads**. The matching controls stay aligned as the dashboard narrows.
+- Keep **G-code** together when the active spool label wraps in any of the five supported languages.
+
+The stable wheel passed 117 private and 317 focused tests. Two checks specific to development builds were skipped.
+
+One universal wheel supports Windows x86-64, Linux x86-64 and ARM64, and macOS Intel and Apple Silicon. It includes separate artwork and translation resources and the MIT license.
+
+[Full changelog](https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md)
+
 ## [2.2.30] - 2026-11-13
 
 ### Changes in 2.2.30

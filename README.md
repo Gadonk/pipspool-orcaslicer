@@ -13,16 +13,13 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
-## Current release: 2.2.30
+## Current release: 2.2.31
 
-Choose **Two-way**, **From Orca**, or **From Spoolman** for each dashboard sync
-of selected advanced fields. Preview the changes and apply them from the same
-panel. The release also clarifies shared tuning and fixes a stale restart notice
-that can appear after relaunching OrcaSlicer in a Flatpak sandbox.
+**Sync direction** now sits beside **Active spool G-code** in **Printer
+Gates/Toolheads**. Both controls stay aligned as the dashboard narrows, and
+**G-code** moves to the next line as a whole when its label wraps.
 
-See the [changelog](CHANGELOG.md#2230---2026-11-13) for details. The restart
-fix was verified with simulated launches that reuse a process ID. Testing on
-the reporter's Arch Linux Flatpak setup is pending.
+See the [changelog](CHANGELOG.md#2231---2026-11-13) for details.
 
 ## At a glance
 
@@ -52,8 +49,8 @@ the reporter's Arch Linux Flatpak setup is pending.
 ## Synchronization choices
 
 Save your changes in the numbered Orca filament profile and select the fields
-you want to synchronize on the PipSpool dashboard. Choose **Advanced sync
-direction** beside **Preview sync**.
+you want to synchronize on the PipSpool dashboard. In **Printer
+Gates/Toolheads**, set **Sync direction** beside **Active spool G-code**.
 
 | Direction | What happens to selected advanced fields |
 | --- | --- |
@@ -213,7 +210,7 @@ dashboard appearance; selecting a theme does not synchronize or rename profiles.
 
 ### Manual installation
 
-1. Download `pipspool-2.2.30-py3-none-any.whl` from the
+1. Download `pipspool-2.2.31-py3-none-any.whl` from the
    [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
    The same wheel supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
    and macOS Apple Silicon. Select the wheel directly; do not unpack it or run pip.
@@ -343,7 +340,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.30 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.31 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. Use OrcaSlicer 2.5.0 or a compatible RC build for
 consolidated permission requests and automatic background inventory loading.
 Compatibility guards retain manual synchronization and the existing first-use
@@ -494,7 +491,7 @@ times depend on the server and still need native Orca measurement.
 
 ## Privacy and release safety
 
-Version 2.2.30 uses one universal wheel of about 4 MB, with bundled artwork and
+Version 2.2.31 uses one universal wheel of about 4 MB, with bundled artwork and
 five translation catalogs stored as separate local package resources. Interface
 translation uses these bundled files without an external translation service.
 Release workflows validate the wheel's metadata, file hashes, source, resources
