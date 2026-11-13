@@ -13,22 +13,16 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
-## Current release: 2.2.29
+## Current release: 2.2.30
 
-PipSpool now offers English, German, French, Spanish and Brazilian Portuguese.
-It follows OrcaSlicer's interface language by default, with a manual choice in
-Settings and an English fallback. Longer labels fit narrow dashboard windows.
+Choose **Two-way**, **From Orca**, or **From Spoolman** for each dashboard sync
+of selected advanced fields. Preview the changes and apply them from the same
+panel. The release also clarifies shared tuning and fixes a stale restart notice
+that can appear after relaunching OrcaSlicer in a Flatpak sandbox.
 
-Hosts with the combined permission API now load the initial Spoolman inventory
-in the background. Permission recovery guidance covers OrcaSlicer 2.5.0, and late
-responses from a previously selected server are ignored. A new coffee-Pip icon
-beside Feedback opens Donko's Ko-fi page when clicked. See the
-[changelog](CHANGELOG.md#2229---2026-11-09).
-
-Native Orca installation, connection timings and permission persistence across
-updates still need testing. Earlier RC restart persistence was confirmed
-locally. Reporter-specific cases in issues #17, #18, #19 and #22 still need
-confirmation or profile evidence.
+See the [changelog](CHANGELOG.md#2230---2026-11-13) for details. The restart
+fix was verified with simulated launches that reuse a process ID. Testing on
+the reporter's Arch Linux Flatpak setup is pending.
 
 ## At a glance
 
@@ -45,8 +39,8 @@ confirmation or profile evidence.
   `SET_ACTIVE_SPOOL ID={spool_id}` as the default, optional per-spool Start G-code,
   and the existing dashboard off switch.
 - Optional synchronization for selected fields across every Orca filament tab.
-- Bidirectional advanced-field updates: one-sided Spoolman changes can update
-  Orca. Conflicting edits are preserved for review and supported conflicts can be resolved explicitly through Preview sync.
+- Per-run direction for selected advanced fields, with two-way sync by default.
+  Review conflicting edits and choose a supported resolution in **Preview sync**.
 - Shared Spoolman Filament values propagate across all associated physical-spool
   profiles without silently overwriting conflicting sibling edits.
 - Native Spoolman field types and units for temperatures, percentages, numbers,
@@ -57,17 +51,34 @@ confirmation or profile evidence.
 
 ## Synchronization choices
 
-Use **Preview sync** to review planned profile changes, Spoolman exports and
-supported conflict choices. Synchronization checks those values again before
-applying a selected choice.
+Save your changes in the numbered Orca filament profile and select the fields
+you want to synchronize on the PipSpool dashboard. Choose **Advanced sync
+direction** beside **Preview sync**.
+
+| Direction | What happens to selected advanced fields |
+| --- | --- |
+| **Two-way** | Eligible edits can move in either direction. This is the default. |
+| **From Orca** | Eligible saved Orca edits update Spoolman and matching Orca profiles. |
+| **From Spoolman** | Eligible Spoolman edits update Orca profiles without writing back to Spoolman. |
+
+Use **Preview sync** to review the direction, planned profile changes, Spoolman
+exports and supported conflict choices. Apply from the preview when ready.
+PipSpool rechecks conflict choices against the current values and scope.
+A field with changes outside the chosen direction may be skipped, including
+its variants. The selector returns to **Two-way** after a dashboard sync.
+Basic spool and profile sync follows your existing settings.
 
 Enable **Create missing profiles only** in Settings to add new spool profiles
 while skipping updates to existing profiles and advanced exports to Spoolman.
 
 **Experimental tuning groups** can share selected advanced fields across matching
-brands and materials. Product-name and colour matching start enabled.
-Differing existing Spoolman values require manual alignment before those fields
-can be grouped. Each spool retains its own identity and inventory.
+brands and materials. Product-name and colour matching start enabled and use
+separate fields. If the Filament names include the colour, **Match product
+name** can still separate them when **Match colour** is off. Clear both
+options only when you want all spools of the matching brand and material to
+share tuning. Differing existing Spoolman values require manual alignment
+before those fields can be grouped. Each spool retains its own identity and
+inventory.
 
 ## Bed temperatures
 
@@ -124,8 +135,8 @@ one place:
   spools.
 - Colour-aware **Printer Gates/Toolheads** overview using assignments already
   reported by Spoolman.
-- **Feedback**, **Refresh** and **Synchronize now** actions, plus a **Sync**
-  button beside each active spool.
+- **Feedback**, **Refresh**, **Preview sync** and **Synchronize now**, plus a
+  **Sync** button beside each active spool.
 - An icon-only coffee-Pip support button beside **Feedback**, with a tooltip and
   keyboard focus indicator.
 - A prominent **Active spool G-code** toggle that is enabled by default and removes
@@ -202,7 +213,7 @@ dashboard appearance; selecting a theme does not synchronize or rename profiles.
 
 ### Manual installation
 
-1. Download `pipspool-2.2.29-py3-none-any.whl` from the
+1. Download `pipspool-2.2.30-py3-none-any.whl` from the
    [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
    The same wheel supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
    and macOS Apple Silicon. Select the wheel directly; do not unpack it or run pip.
@@ -234,7 +245,8 @@ Generated profiles use this order by default:
 
 ### Synchronize one spool
 
-Select **Sync** beside an active spool. The checked scope follows Settings:
+Select **Sync** beside an active spool. It uses the dashboard's current
+advanced sync direction. The checked scope follows Settings:
 independent mode checks that spool; shared mode also reconciles its active
 Filament siblings when advanced fields are selected; experimental tuning groups
 check matching active spools across Filament records. Without a group or selected
@@ -309,9 +321,9 @@ are preserved with a visible error instead of being overwritten.
 
 PipSpool preserves unrelated Orca-specific profile adjustments. Advanced-field
 synchronization remembers the last agreed value so it can identify which side
-changed. A one-sided Spoolman edit is imported into Orca; a one-sided Orca edit
-is exported to Spoolman. If both sides changed differently, both values are
-preserved for review. Use Preview sync to choose a supported resolution.
+changed. The dashboard direction limits which edits can be applied in that run.
+If both sides changed differently, their values are preserved for review.
+Use **Preview sync** to choose a supported resolution.
 
 ## Features I’m working on
 
@@ -331,7 +343,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.29 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.30 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. Use OrcaSlicer 2.5.0 or a compatible RC build for
 consolidated permission requests and automatic background inventory loading.
 Compatibility guards retain manual synchronization and the existing first-use
@@ -482,7 +494,7 @@ times depend on the server and still need native Orca measurement.
 
 ## Privacy and release safety
 
-Version 2.2.29 uses one universal wheel of about 4 MB, with bundled artwork and
+Version 2.2.30 uses one universal wheel of about 4 MB, with bundled artwork and
 five translation catalogs stored as separate local package resources. Interface
 translation uses these bundled files without an external translation service.
 Release workflows validate the wheel's metadata, file hashes, source, resources

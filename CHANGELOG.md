@@ -2,6 +2,21 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.30] - 2026-11-13
+
+### Changes in 2.2.30
+
+- Choose Two-way, From Orca, or From Spoolman for selected advanced fields on each dashboard sync. Two-way remains the default. From Orca shares eligible saved Orca edits with Spoolman and matching Orca profiles. From Spoolman applies eligible Spoolman edits to Orca without writing back.
+- Review the direction, planned profile changes and Spoolman exports in Preview sync. Apply from the preview with or without a supported conflict choice. Skipped fields retain their values and last agreed sync state. A directional run can preserve a whole field when its variants have edits in both directions.
+- Add tooltips to the sync controls and explain how product-name and colour matching affect shared tuning. Existing spool identity and basic profile settings still govern ordinary profile sync.
+- Tie the restart notice to the running Orca session so a reused process ID cannot display an old notice after a full restart. The saved synchronization report remains available.
+
+The stable wheel passed 117 private and 317 focused tests, with two development-only checks skipped. Browser checks used a simulated Orca connection. Native Orca and the exact reporter setup remain pending. [Issue #23](https://github.com/Gadonk/pipspool-orcaslicer/issues/23)
+
+One universal wheel supports Windows x86-64, Linux x86-64 and ARM64, and macOS Intel and Apple Silicon. It includes separate artwork and translation resources and the MIT license.
+
+[Full changelog](https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md)
+
 ## [2.2.29] - 2026-11-09
 
 ### Changes in 2.2.29
