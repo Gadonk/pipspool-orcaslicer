@@ -15,11 +15,15 @@ filament usage.
 
 ## Current release: 2.2.31
 
-**Sync direction** now sits beside **Active spool G-code** in **Printer
+**From Orca** now uses explicitly saved filament values for automatic
+advanced exports. A value inherited from a parent preset or still loaded from
+before a Spoolman import can no longer trigger an automatic export.
+
+**Sync direction** sits beside **Active spool G-code** in **Printer
 Gates/Toolheads**. Both controls stay aligned as the dashboard narrows, and
 **G-code** moves to the next line as a whole when its label wraps.
 
-See the [changelog](CHANGELOG.md#2231---2026-11-13) for details.
+See the [changelog](CHANGELOG.md#2231---2026-11-15) for details.
 
 ## At a glance
 
@@ -55,7 +59,7 @@ Gates/Toolheads**, set **Sync direction** beside **Active spool G-code**.
 | Direction | What happens to selected advanced fields |
 | --- | --- |
 | **Two-way** | Eligible edits can move in either direction. This is the default. |
-| **From Orca** | Eligible saved Orca edits update Spoolman and matching Orca profiles. |
+| **From Orca** | Eligible, explicitly saved Orca values update Spoolman and matching Orca profiles. |
 | **From Spoolman** | Eligible Spoolman edits update Orca profiles without writing back to Spoolman. |
 
 Use **Preview sync** to review the direction, planned profile changes, Spoolman

@@ -2,14 +2,15 @@
 
 All notable PipSpool changes are documented here.
 
-## [2.2.31] - 2026-11-13
+## [2.2.31] - 2026-11-15
 
 ### Changes in 2.2.31
 
+- Use explicitly saved Orca filament values for automatic **From Orca** exports. This prevents inherited defaults from filling unrelated Spoolman fields and keeps older loaded values from undoing a recent import. A partially inherited variant field is preserved when a required value is unavailable. [Issue #23](https://github.com/Gadonk/pipspool-orcaslicer/issues/23)
 - Move **Sync direction** next to **Active spool G-code** in **Printer Gates/Toolheads**. The matching controls stay aligned as the dashboard narrows.
 - Keep **G-code** together when the active spool label wraps in any of the five supported languages.
 
-The stable wheel passed 117 private and 317 focused tests. Two checks specific to development builds were skipped.
+The stable wheel passed 117 private and 321 focused tests. Seventeen checks for development or experimental features were skipped. The reporter confirmed the Flatpak restart warning fix from 2.2.30. The new export behavior still awaits a live retest.
 
 One universal wheel supports Windows x86-64, Linux x86-64 and ARM64, and macOS Intel and Apple Silicon. It includes separate artwork and translation resources and the MIT license.
 
