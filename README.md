@@ -13,17 +13,16 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
-## Current release: 2.2.31
+## Current release: 2.2.32
 
-**From Orca** now uses explicitly saved filament values for automatic
-advanced exports. A value inherited from a parent preset or still loaded from
-before a Spoolman import can no longer trigger an automatic export.
+Select **Русский** in **PipSpool Settings → Language**, or use automatic
+language selection with OrcaSlicer set to Russian. Thanks to GNUGiminot for
+contributing the translation. [Issue #24](https://github.com/Gadonk/pipspool-orcaslicer/issues/24)
 
-**Sync direction** sits beside **Active spool G-code** in **Printer
-Gates/Toolheads**. Both controls stay aligned as the dashboard narrows, and
-**G-code** moves to the next line as a whole when its label wraps.
+The **Last synchronization** panel uses the selected language for its summary
+as soon as the dashboard opens.
 
-See the [changelog](CHANGELOG.md#2231---2026-11-15) for details.
+See the [changelog](CHANGELOG.md#2232---2026-11-15) for details.
 
 ## At a glance
 
@@ -167,9 +166,9 @@ Opening or refreshing the dashboard does not contact Ko-fi. [Support PipSpool](h
 ## Interface language
 
 Open **PipSpool Settings → Language** to choose **English**, **Deutsch**,
-**Français**, **Español** or **Português (Brasil)**. The default, **Use OrcaSlicer
-language (automatic)**, follows Orca's interface language when the host provides
-it. Unsupported languages and older hosts without language information use
+**Français**, **Español**, **Português (Brasil)** or **Русский**. The default,
+**Use OrcaSlicer language (automatic)**, follows Orca's interface language when
+the host provides it. Unsupported languages and older hosts without language information use
 English. A manual choice is saved independently of Orca's language.
 
 After saving, reopen PipSpool windows or use **Refresh** on the dashboard to apply
@@ -214,7 +213,7 @@ dashboard appearance; selecting a theme does not synchronize or rename profiles.
 
 ### Manual installation
 
-1. Download `pipspool-2.2.31-py3-none-any.whl` from the
+1. Download `pipspool-2.2.32-py3-none-any.whl` from the
    [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
    The same wheel supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
    and macOS Apple Silicon. Select the wheel directly; do not unpack it or run pip.
@@ -344,7 +343,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.31 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.32 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. Use OrcaSlicer 2.5.0 or a compatible RC build for
 consolidated permission requests and automatic background inventory loading.
 Compatibility guards retain manual synchronization and the existing first-use
@@ -495,8 +494,8 @@ times depend on the server and still need native Orca measurement.
 
 ## Privacy and release safety
 
-Version 2.2.31 uses one universal wheel of about 4 MB, with bundled artwork and
-five translation catalogs stored as separate local package resources. Interface
+Version 2.2.32 uses one universal wheel of about 4 MB, with bundled artwork and
+six translation catalogs stored as separate local package resources. Interface
 translation uses these bundled files without an external translation service.
 Release workflows validate the wheel's metadata, file hashes, source, resources
 and upload size before creating a draft or contacting Orca Cloud. Packaging does

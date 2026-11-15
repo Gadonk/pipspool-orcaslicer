@@ -2,6 +2,17 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.32] - 2026-11-15
+
+### Changes in 2.2.32
+
+- Add Russian to PipSpool's interface languages. Choose **Русский** in Settings or let PipSpool follow OrcaSlicer's language. Thanks to GNUGiminot for contributing the translation. [Issue #24](https://github.com/Gadonk/pipspool-orcaslicer/issues/24)
+- Translate the summary in **Last synchronization** when the dashboard first opens. Spool and profile names and saved report data keep their original values.
+
+One universal wheel supports Windows x86-64, Linux x86-64 and ARM64, and macOS Intel and Apple Silicon. It includes bundled translations, artwork and the MIT license.
+
+[Full changelog](https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md)
+
 ## [2.2.31] - 2026-11-15
 
 ### Changes in 2.2.31

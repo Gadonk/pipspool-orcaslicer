@@ -15,7 +15,7 @@ import zipfile
 MAX_PAYLOAD_BYTES = 50_000_000
 MULTIPART_ALLOWANCE_BYTES = 64 * 1024
 BUNDLED_ARTWORK_COUNT = 28
-BUNDLED_LOCALES = ("en", "de", "fr", "es", "pt_BR")
+BUNDLED_LOCALES = ("en", "de", "fr", "es", "pt_BR", "ru")
 PLACEHOLDERS = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
