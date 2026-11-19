@@ -13,16 +13,19 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
-## Current release: 2.2.32
+## Current release: 2.2.33
 
-Select **Русский** in **PipSpool Settings → Language**, or use automatic
-language selection with OrcaSlicer set to Russian. Thanks to GNUGiminot for
-contributing the translation. [Issue #24](https://github.com/Gadonk/pipspool-orcaslicer/issues/24)
+Choose which extruder variants PipSpool includes in your profiles, such as only
+**Direct Drive Standard (SF)** and **High Flow (HF)**. **All variants (default)**
+keeps the existing behavior. Excluded tuning is retained locally for restoration.
+Save the selection, synchronize, then restart OrcaSlicer.
 
-The **Last synchronization** panel uses the selected language for its summary
-as soon as the dashboard opens.
+This release also translates changed-field labels in synchronization reports and
+protects accepted scalar imports from older loaded Orca values during repeated
+two-way synchronization. Six interface languages remain available, including
+Russian contributed by GNUGiminot. [Issue #24](https://github.com/Gadonk/pipspool-orcaslicer/issues/24)
 
-See the [changelog](CHANGELOG.md#2232---2026-11-15) for details.
+See the [changelog](CHANGELOG.md#2233---2026-11-19) for details and testing limits.
 
 ## At a glance
 
@@ -39,6 +42,7 @@ See the [changelog](CHANGELOG.md#2232---2026-11-15) for details.
   `SET_ACTIVE_SPOOL ID={spool_id}` as the default, optional per-spool Start G-code,
   and the existing dashboard off switch.
 - Optional synchronization for selected fields across every Orca filament tab.
+- Optional extruder-variant selection with excluded tuning retained for restoration.
 - Per-run direction for selected advanced fields, with two-way sync by default.
   Review conflicting edits and choose a supported resolution in **Preview sync**.
 - Shared Spoolman Filament values propagate across all associated physical-spool
@@ -46,7 +50,7 @@ See the [changelog](CHANGELOG.md#2232---2026-11-15) for details.
 - Native Spoolman field types and units for temperatures, percentages, numbers,
   booleans and supported choices.
 - No slicer-side filament deduction and no duplicate process profiles.
-- Five interface languages, automatic Orca language selection and a saved manual
+- Six interface languages, automatic Orca language selection and a saved manual
   override.
 
 ## Synchronization choices
@@ -79,6 +83,39 @@ options only when you want all spools of the matching brand and material to
 share tuning. Differing existing Spoolman values require manual alignment
 before those fields can be grouped. Each spool retains its own identity and
 inventory.
+
+## Extruder variants
+
+Open **PipSpool Settings → Extruder variants**. Leave **All variants (default)**
+selected to retain every available variant, or clear it and choose the variants
+you want in PipSpool-managed profiles. Direct Drive and Bowden each offer
+Standard (SF), High Flow (HF), Hybrid, TPU High Flow, E3D High Flow and Extra
+High Flow. PipSpool includes matching variants already present in a verified
+profile; choosing a label does not invent missing tuning.
+
+Save Settings, review **Preview sync**, synchronize, and restart OrcaSlicer to
+load the new variant list. Settings alone does not change profiles. **Create
+missing profiles only** continues to skip existing profiles.
+
+Excluded values remain in local backing under Orca's persistent
+`pipspool/variant-profiles/` folder, including later synchronized excluded tuning.
+Keep this folder if you need to restore them. To restore the full list, select
+**All variants (default)**, save, synchronize and restart. Included edits and
+excluded tuning are retained. Backing belongs to the original profile path and
+Spoolman server; a mismatch blocks that profile's write rather than reusing
+another profile's data.
+
+Narrowed profiles contain materialized tuning so parent inheritance cannot bring
+excluded variants back on reload. Restoring All keeps the full values and parent;
+it does not recreate the original sparse inheritance text. Unsupported parent
+includes, incomplete identities or ambiguous vectors preserve the affected file
+and produce an error. Shared-Filament and per-variant conflicts still require a
+supported resolution before affected writes.
+
+Automated regression and simulated-browser checks passed. Native Orca reload,
+cross-platform permissions and real printer workflows still need user feedback.
+Please include your Orca/PipSpool versions and the exact reported error when
+reporting a problem in [GitHub Issues](https://github.com/Gadonk/pipspool-orcaslicer/issues).
 
 ## Bed temperatures
 
@@ -213,7 +250,7 @@ dashboard appearance; selecting a theme does not synchronize or rename profiles.
 
 ### Manual installation
 
-1. Download `pipspool-2.2.32-py3-none-any.whl` from the
+1. Download `pipspool-2.2.33-py3-none-any.whl` from the
    [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
    The same wheel supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
    and macOS Apple Silicon. Select the wheel directly; do not unpack it or run pip.
@@ -343,7 +380,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.32 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.33 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. Use OrcaSlicer 2.5.0 or a compatible RC build for
 consolidated permission requests and automatic background inventory loading.
 Compatibility guards retain manual synchronization and the existing first-use
@@ -494,7 +531,7 @@ times depend on the server and still need native Orca measurement.
 
 ## Privacy and release safety
 
-Version 2.2.32 uses one universal wheel of about 4 MB, with bundled artwork and
+Version 2.2.33 uses one universal wheel of about 4 MB, with bundled artwork and
 six translation catalogs stored as separate local package resources. Interface
 translation uses these bundled files without an external translation service.
 Release workflows validate the wheel's metadata, file hashes, source, resources

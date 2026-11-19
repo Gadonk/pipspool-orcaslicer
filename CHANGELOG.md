@@ -2,6 +2,25 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.33] - 2026-11-19
+
+### Changes in 2.2.33
+
+- Add **Settings → Extruder variants**. Keep **All variants (default)** or choose matching Direct Drive/Bowden variants, including Standard (SF) and High Flow (HF). Save, synchronize and restart Orca to apply the selection. No missing variant tuning is generated.
+- Keep excluded tuning in local backing for restoration, including later synchronized values. Returning to All restores the full values and parent. Keep Orca's persistent `pipspool/variant-profiles/` folder; backing is specific to the original profile path and Spoolman server. Subset tuning is materialized rather than restored to sparse inheritance text.
+- Preserve spool/profile identity and exact variant correspondence across flow, speed, retraction, nozzle, fan and other variant-specific values. Preview stays read-only. Unverified parents/IDs, unsupported includes, ambiguous vectors, failed writes and unresolved conflicts preserve the affected profile and report an error. Create-only mode still skips existing profiles.
+- Prevent Orca's stale full layout from exporting an excluded value after a backing-only import on repeated synchronization. Genuine included edits still synchronize. Shared-Filament and per-variant conflict protection remain enabled.
+- Keep accepted scalar imports from being reversed by older loaded Orca values during repeated two-way synchronization. [Issue #23](https://github.com/Gadonk/pipspool-orcaslicer/issues/23)
+- Translate changed-field labels in the displayed synchronization change list, including Russian. User-entered profile names, raw values and saved report data retain their content. Thanks to GNUGiminot for reporting the mixed-language labels. [Issue #24](https://github.com/Gadonk/pipspool-orcaslicer/issues/24)
+
+All variants remains the default for new and existing settings. Variant selection is optional and does not assign printer/toolhead slots. This release does not claim to resolve the outstanding reporter-specific cases in issues #17, #18 or #19.
+
+Both complete suites passed against the stable wheel: 117 private and 398 focused tests, with 17 development/experimental checks skipped. Settings passed 72 simulated-browser checks across six languages and three widths. Native Orca reload, cross-platform permissions and printer workflows remain pending user feedback; no physical print or reporter confirmation is claimed.
+
+One universal wheel supports Windows x86-64, Linux x86-64/ARM64 and macOS Intel/Apple Silicon, with 28 separate artwork resources, six bundled translation catalogs and the MIT license.
+
+[Full changelog](https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md)
+
 ## [2.2.32] - 2026-11-15
 
 ### Changes in 2.2.32
