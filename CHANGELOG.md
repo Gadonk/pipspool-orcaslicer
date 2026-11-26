@@ -2,6 +2,17 @@
 
 All notable PipSpool changes are documented here.
 
+## [2.2.34] - 2026-11-26
+
+### Changes in 2.2.34
+
+- Fix a sync error after OrcaSlicer 2.5.2 saves a filament preset filtered to selected extruder variants, such as Direct Drive Standard (SF) and High Flow (HF). Orca can add two settings to the saved profile, `long_retractions_when_ec` and `filament_ramming_travel_time_nc`. PipSpool now reconciles those settings when it can verify the excluded values. If a value is ambiguous, PipSpool preserves the profile and reports the field. Thanks to CroVlado for the report.
+- Preserve distinct first-layer and subsequent-layer nozzle temperatures across extruder variants during ordinary sync. Previously, Spoolman’s single inventory temperature could overwrite those differences even when no advanced temperature fields were selected. For example, a Standard variant tuned to 230 °C now keeps that value when the High Flow variant and Spoolman use 210 °C. When either nozzle temperature is selected for advanced sync, values follow the matching extruder variant. PipSpool flags ambiguous changes to a legacy single temperature for review.
+
+**If an earlier sync overwrote your temperatures**, restore the affected values from a known-good filament profile or backup. Updating PipSpool protects future syncs. It cannot reconstruct tuning that has already been lost.
+
+[Full changelog](https://github.com/Gadonk/pipspool-orcaslicer/blob/main/CHANGELOG.md)
+
 ## [2.2.33] - 2026-11-19
 
 ### Changes in 2.2.33

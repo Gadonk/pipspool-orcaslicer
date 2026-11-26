@@ -13,19 +13,21 @@ PipSpool is maintained by **Donko** and designed for printers where Klipper,
 Moonraker, Happy Hare or another Spoolman integration already handles real-time
 filament usage.
 
-## Current release: 2.2.33
+## Current release: 2.2.34
 
-Choose which extruder variants PipSpool includes in your profiles, such as only
-**Direct Drive Standard (SF)** and **High Flow (HF)**. **All variants (default)**
-keeps the existing behavior. Excluded tuning is retained locally for restoration.
-Save the selection, synchronize, then restart OrcaSlicer.
+If you use only Direct Drive Standard (SF) and High Flow (HF), saving your
+filament preset in OrcaSlicer 2.5.2 could leave PipSpool unable to sync it.
+PipSpool now recovers the two affected settings when it can verify their values
+for the excluded variants. Thanks to CroVlado for reporting this.
 
-This release also translates changed-field labels in synchronization reports and
-protects accepted scalar imports from older loaded Orca values during repeated
-two-way synchronization. Six interface languages remain available, including
-Russian contributed by GNUGiminot. [Issue #24](https://github.com/Gadonk/pipspool-orcaslicer/issues/24)
+Ordinary sync now keeps different nozzle temperatures you have saved for
+individual extruder variants, for both the first layer and subsequent layers.
+If you select either nozzle temperature for advanced sync, PipSpool matches
+values by extruder variant and flags ambiguous changes for review.
+If an earlier sync replaced those temperatures with a single value, restore the
+affected settings from a known-good profile or backup.
 
-See the [changelog](CHANGELOG.md#2233---2026-11-19) for details and testing limits.
+[See the 2.2.34 changelog](CHANGELOG.md#2234---2026-11-26)
 
 ## At a glance
 
@@ -36,8 +38,9 @@ See the [changelog](CHANGELOG.md#2233---2026-11-19) for details and testing limi
 - Automatic removal of the matching profile when a spool is archived.
 - Configurable profile naming, with `(#42) PLA Galaxy Blue - Manufacturer - PipSpool`
   retained as the default and a mandatory spool ID for safe matching.
-- Nozzle temperatures imported from Spoolman; saved Orca bed temperatures kept
-  by default, with an optional all-plate Spoolman override.
+- Inventory nozzle temperature from Spoolman, with distinct saved Orca nozzle
+  temperatures preserved per extruder variant. Saved Orca bed temperatures are
+  kept by default, with an optional all-plate Spoolman override.
 - Configurable spool-ID command with `{spool_id}` substitution, retaining
   `SET_ACTIVE_SPOOL ID={spool_id}` as the default, optional per-spool Start G-code,
   and the existing dashboard off switch.
@@ -250,7 +253,7 @@ dashboard appearance; selecting a theme does not synchronize or rename profiles.
 
 ### Manual installation
 
-1. Download `pipspool-2.2.33-py3-none-any.whl` from the
+1. Download `pipspool-2.2.34-py3-none-any.whl` from the
    [latest GitHub release](https://github.com/Gadonk/pipspool-orcaslicer/releases/latest).
    The same wheel supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
    and macOS Apple Silicon. Select the wheel directly; do not unpack it or run pip.
@@ -380,7 +383,7 @@ Suggestions and reproducible test cases are welcome in
 
 ## Compatibility
 
-PipSpool 2.2.33 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
+PipSpool 2.2.34 supports Windows x86-64, Linux x86-64, Linux ARM64, macOS Intel
 and macOS Apple Silicon. Use OrcaSlicer 2.5.0 or a compatible RC build for
 consolidated permission requests and automatic background inventory loading.
 Compatibility guards retain manual synchronization and the existing first-use
@@ -531,7 +534,7 @@ times depend on the server and still need native Orca measurement.
 
 ## Privacy and release safety
 
-Version 2.2.33 uses one universal wheel of about 4 MB, with bundled artwork and
+Version 2.2.34 uses one universal wheel of about 4 MB, with bundled artwork and
 six translation catalogs stored as separate local package resources. Interface
 translation uses these bundled files without an external translation service.
 Release workflows validate the wheel's metadata, file hashes, source, resources
